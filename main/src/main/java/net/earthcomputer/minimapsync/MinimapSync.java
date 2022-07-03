@@ -37,7 +37,7 @@ public class MinimapSync implements ModInitializer {
             WaypointCommand.register(dispatcher);
         });
         S2CPlayChannelEvents.REGISTER.register((handler, sender, server, channels) -> {
-            if (ServerPlayNetworking.canSend(handler, INIT_MODEL)) {
+            if (channels.contains(INIT_MODEL)) {
                 server.execute(() -> {
                     FriendlyByteBuf buf = PacketByteBufs.create();
                     Model.get(server).toPacket(buf);
