@@ -37,7 +37,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     private static com.mamiyaotaru.voxelmap.util.Waypoint toVoxel(Waypoint waypoint) {
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
-        DimensionContainer currentDimension = dimensionManager.getDimensionContainerByWorld(Minecraft.getInstance().level);
+        DimensionContainer currentDimension = dimensionManager.getDimensionContainerByIdentifier(waypoint.dimension().location().toString());
         return new com.mamiyaotaru.voxelmap.util.Waypoint(
             waypoint.name(),
             waypoint.pos().getX(),
@@ -63,7 +63,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
             (((int) (waypoint.red * 255) & 0xff) << 16) | (((int) (waypoint.green * 255) & 0xff) << 8) | ((int) (waypoint.blue * 255) & 0xff),
             dimension,
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
-            Minecraft.getInstance().getUser().getGameProfile().getId()
+            Minecraft.getInstance().getUser().getGameProfile().getId(),
+            Minecraft.getInstance().getUser().getGameProfile().getName()
         );
     }
 

@@ -48,7 +48,7 @@ public class MinimapSync implements ModInitializer {
 
         ServerPlayNetworking.registerGlobalReceiver(ADD_WAYPOINT, (server, player, handler, buf, responseSender) -> {
             Waypoint waypoint = new Waypoint(buf);
-            server.execute(() -> addWaypoint(player, server, waypoint));
+            server.execute(() -> addWaypoint(player, server, waypoint.withAuthor(player.getUUID()).withAuthorName(player.getGameProfile().getName())));
         });
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_WAYPOINT, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);

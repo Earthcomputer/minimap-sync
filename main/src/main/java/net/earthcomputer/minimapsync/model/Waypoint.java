@@ -15,7 +15,8 @@ public record Waypoint(
     int color,
     ResourceKey<Level> dimension,
     BlockPos pos,
-    @Nullable UUID author
+    @Nullable UUID author,
+    @Nullable String authorName
 ) {
     public Waypoint(FriendlyByteBuf buf) {
         this(
@@ -24,7 +25,8 @@ public record Waypoint(
             buf.readInt(),
             ResourceKey.create(Registry.DIMENSION_REGISTRY, buf.readResourceLocation()),
             buf.readBlockPos(),
-            buf.readBoolean() ? buf.readUUID() : null
+            buf.readBoolean() ? buf.readUUID() : null,
+            buf.readBoolean() ? buf.readUtf(16) : null
         );
     }
 
@@ -41,17 +43,29 @@ public record Waypoint(
         if (author != null) {
             buf.writeUUID(author);
         }
+        buf.writeBoolean(authorName != null);
+        if (authorName != null) {
+            buf.writeUtf(authorName, 16);
+        }
     }
 
     public Waypoint withDescription(@Nullable String description) {
-        return new Waypoint(name, description, color, dimension, pos, author);
+        return new Waypoint(name, description, color, dimension, pos, author, authorName);
     }
 
     public Waypoint withPos(BlockPos pos) {
-        return new Waypoint(name, description, color, dimension, pos, author);
+        return new Waypoint(name, description, color, dimension, pos, author, authorName);
     }
 
     public Waypoint withColor(int color) {
-        return new Waypoint(name, description, color, dimension, pos, author);
+        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+    }
+
+    public Waypoint withAuthor(@Nullable UUID author) {
+        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+    }
+
+    public Waypoint withAuthorName(@Nullable String authorName) {
+        return new Waypoint(name, description, color, dimension, pos, author, authorName);
     }
 }

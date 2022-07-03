@@ -8,7 +8,8 @@
     "MinecraftServerMixin"
   ],
   "client": [
-    "ClientPacketListenerMixin"
+    "ClientPacketListenerMixin",
+    "voxelmap.WaypointManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

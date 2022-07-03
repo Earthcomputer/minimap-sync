@@ -19,7 +19,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
@@ -27,11 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
@@ -103,7 +98,8 @@ public class WaypointCommand {
             color,
             source.getLevel().dimension(),
             pos,
-            uuid
+            uuid,
+            entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null
         );
 
         if (!MinimapSync.addWaypoint(null, source.getServer(), waypoint)) {
@@ -147,69 +143,59 @@ public class WaypointCommand {
         Entity entity = source.getEntity();
         boolean canTeleport = entity instanceof ServerPlayer player && model.teleportRule().canTeleport(player);
 
-        Map<UUID, String> playerNames = new ConcurrentHashMap<>();
-        CompletableFuture.allOf(waypoints.stream().map(Waypoint::author).filter(Objects::nonNull).distinct().map(uuid -> {
-            CompletableFuture<Void> profile = new CompletableFuture<>();
-            SkullBlockEntity.updateGameprofile(new GameProfile(uuid, null), filledProfile -> {
-                playerNames.put(uuid, filledProfile.getName());
-                profile.complete(null);
-            });
-            return profile;
-        }).toArray(CompletableFuture[]::new)).whenComplete((v, error) -> source.getServer().execute(() -> {
-            for (Waypoint waypoint : waypoints) {
-                @Language("JSON") String authorStr;
-                if (waypoint.author() == null) {
-                    authorStr = "";
-                } else {
-                    authorStr = """
-                        [
-                            " by ",
-                            {"text": "%s", "color": "gray"}
-                        ]
-                    """;
-                    authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(playerNames.get(waypoint.author())));
-                    authorStr = "," + authorStr;
-                }
-                @Language("JSON") String teleportStr;
-                if (!canTeleport) {
-                    teleportStr = "";
-                } else {
-                    teleportStr = """
-                        [
-                            " ",
-                            {
-                                "text": "[Teleport]",
-                                "color": "gold",
-                                "clickEvent": {
-                                    "action": "run_command",
-                                    "value": "/waypoint tp %s"
-                                }
-                            }
-                        ]
-                    """;
-                    teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()));
-                    teleportStr = "," + teleportStr;
-                }
-                source.sendSuccess(MinimapSync.createComponent("""
-                        [
-                            "- ",
-                            {"text": "%s", "color": "#%06x"},
-                            {"text": " %d %d %d"}
-                            %s%s
-                        ]
-                    """,
-                    StringEscapeUtils.escapeJson(waypoint.name()),
-                    waypoint.color(),
-                    waypoint.pos().getX(),
-                    waypoint.pos().getY(),
-                    waypoint.pos().getZ(),
-                    authorStr,
-                    teleportStr
-                ), false);
+        for (Waypoint waypoint : waypoints) {
+            @Language("JSON") String authorStr;
+            if (waypoint.authorName() == null) {
+                authorStr = "";
+            } else {
+                authorStr = """
+                    [
+                        " by ",
+                        {"text": "%s", "color": "gray"}
+                    ]
+                """;
+                authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(waypoint.authorName()));
+                authorStr = "," + authorStr;
             }
-        }));
+            @Language("JSON") String teleportStr;
+            if (!canTeleport) {
+                teleportStr = "";
+            } else {
+                teleportStr = """
+                    [
+                        " ",
+                        {
+                            "text": "[Teleport]",
+                            "color": "gold",
+                            "clickEvent": {
+                                "action": "run_command",
+                                "value": "/waypoint tp %s"
+                            }
+                        }
+                    ]
+                """;
+                teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()));
+                teleportStr = "," + teleportStr;
+            }
+            source.sendSuccess(MinimapSync.createComponent("""
+                    [
+                        "- ",
+                        {"text": "%s", "color": "#%06x"},
+                        {"text": " %d %d %d"}
+                        %s%s
+                    ]
+                """,
+                StringEscapeUtils.escapeJson(waypoint.name()),
+                waypoint.color(),
+                waypoint.pos().getX(),
+                waypoint.pos().getY(),
+                waypoint.pos().getZ(),
+                authorStr,
+                teleportStr
+            ), false);
+        }
 
-        return Command.SINGLE_SUCCESS;
+        return waypoints.size();
     }
 
     private static int tpWaypoint(CommandSourceStack source, String name) throws CommandSyntaxException {
