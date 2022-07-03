@@ -1,0 +1,5 @@
+
+allprojects {
+    version = rootProject.mod_version
+    group = rootProject.maven_group
+}

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.earthcomputer.minimapsync.mixin",
+  "compatibilityLevel": "JAVA_16",
+  "plugin": "net.earthcomputer.minimapsync.MixinConfigPlugin",
+  "mixins": [
+    "MinecraftServerMixin"
+  ],
+  "client": [
+    "ClientPacketListenerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

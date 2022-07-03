@@ -1,0 +1,17 @@
+plugins {
+    id 'fabric-loom' version '0.12-SNAPSHOT'
+}
+
+loom {
+    mixin {
+        useLegacyMixinAp = false
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+    mappings loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${rootProject.minecraft_version}:${rootProject.parchment_version}@zip")
+    }
+}

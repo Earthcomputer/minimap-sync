@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "minimapsync",
+  "version": "${version}",
+  "name": "MinimapSync",
+  "description": "Synchronization of minimaps",
+  "authors": [
+    "Earthcomputer"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/minimapsync/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "net.earthcomputer.minimapsync.client.MinimapSyncClient"
+    ],
+    "main": [
+      "net.earthcomputer.minimapsync.MinimapSync"
+    ]
+  },
+  "mixins": [
+    "minimapsync.mixins.json"
+  ],
+  "accessWidener": "minimapsync.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.14.8",
+    "fabric": "*",
+    "minecraft": "1.17.1"
+  }
+}
