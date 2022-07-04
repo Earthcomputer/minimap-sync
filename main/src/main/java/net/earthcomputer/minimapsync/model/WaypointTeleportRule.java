@@ -1,6 +1,6 @@
 package net.earthcomputer.minimapsync.model;
 
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 public enum WaypointTeleportRule {
     NEVER,
@@ -10,7 +10,7 @@ public enum WaypointTeleportRule {
     ALWAYS,
     ;
 
-    public boolean canTeleport(ServerPlayer player) {
+    public boolean canTeleport(Player player) {
         return switch (this) {
             case NEVER -> false;
             case CREATIVE_PLAYERS -> player.isCreative();

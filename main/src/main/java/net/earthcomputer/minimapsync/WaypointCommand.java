@@ -15,7 +15,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.commands.TeleportCommand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -27,7 +26,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -226,25 +224,10 @@ public class WaypointCommand {
         if (!(entity instanceof ServerPlayer player) || !model.teleportRule().canTeleport(player)) {
             throw CANNOT_TELEPORT_EXCEPTION.create();
         }
-        Waypoint waypoint = model.waypoints().getWaypoint(name);
-        if (waypoint == null) {
+
+        if (!MinimapSync.teleportToWaypoint(server, entity, name, dimension)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
-
-        double scale = 1 / dimension.dimensionType().coordinateScale();
-
-        TeleportCommand.performTeleport(
-            source,
-            entity,
-            dimension,
-            waypoint.pos().getX() * scale + 0.5,
-            waypoint.pos().getY(),
-            waypoint.pos().getZ() * scale + 0.5,
-            Collections.emptySet(),
-            entity.getYRot(),
-            entity.getXRot(),
-            null
-        );
 
         source.sendSuccess(Component.nullToEmpty("Teleported to waypoint: " + name), true);
 

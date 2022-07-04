@@ -3,15 +3,20 @@ package net.earthcomputer.minimapsync.client;
 import com.mamiyaotaru.voxelmap.interfaces.AbstractVoxelMap;
 import com.mamiyaotaru.voxelmap.interfaces.IDimensionManager;
 import com.mamiyaotaru.voxelmap.interfaces.IWaypointManager;
+import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
@@ -267,5 +272,28 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointTeleportRule(ClientPacketListener handler, WaypointTeleportRule rule) {
+    }
+
+    public boolean teleport(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
+        if (isDeathpoint(waypoint)) {
+            return false;
+        }
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return false;
+        }
+        if (!Model.get(player.connection).teleportRule().canTeleport(player)) {
+            return false;
+        }
+        if (!ClientPlayNetworking.canSend(MinimapSync.TELEPORT)) {
+            return false;
+        }
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(waypoint.name, 256);
+        buf.writeBoolean(false); // null dimension type (current dimension)
+        ClientPlayNetworking.send(MinimapSync.TELEPORT, buf);
+
+        return true;
     }
 }

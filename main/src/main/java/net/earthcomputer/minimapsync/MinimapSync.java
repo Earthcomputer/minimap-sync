@@ -1,5 +1,6 @@
 package net.earthcomputer.minimapsync;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -17,11 +18,15 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.commands.TeleportCommand;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -35,6 +40,7 @@ public class MinimapSync implements ModInitializer {
     public static final ResourceLocation SET_WAYPOINT_COLOR = new ResourceLocation("minimapsync:set_waypoint_color");
     public static final ResourceLocation SET_WAYPOINT_DESCRIPTION = new ResourceLocation("minimapsync:set_waypoint_description");
     public static final ResourceLocation SET_WAYPOINT_TELEPORT_RULE = new ResourceLocation("minimapsync:set_waypoint_teleport_rule");
+    public static final ResourceLocation TELEPORT = new ResourceLocation("minimapsync:teleport");
 
 
     @Override
@@ -74,6 +80,23 @@ public class MinimapSync implements ModInitializer {
             String name = buf.readUtf(256);
             int color = buf.readInt();
             server.execute(() -> setWaypointColor(player, server, name, color));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(TELEPORT, (server, player, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            ResourceLocation dimensionId = buf.readBoolean() ? buf.readResourceLocation() : null;
+            server.execute(() -> {
+                if (Model.get(server).teleportRule().canTeleport(player)) {
+                    ServerLevel level = dimensionId == null
+                        ? (ServerLevel) player.level
+                        : server.getLevel(ResourceKey.create(Registry.DIMENSION_REGISTRY, dimensionId));
+                    if (level != null) {
+                        try {
+                            teleportToWaypoint(server, player, name, level);
+                        } catch (CommandSyntaxException ignore) {
+                        }
+                    }
+                }
+            });
         });
     }
 
@@ -214,5 +237,29 @@ public class MinimapSync implements ModInitializer {
                 player.connection.send(packet);
             }
         }
+    }
+
+    public static boolean teleportToWaypoint(MinecraftServer server, Entity entity, String name, ServerLevel dimension) throws CommandSyntaxException {
+        Waypoint waypoint = Model.get(server).waypoints().getWaypoint(name);
+        if (waypoint == null) {
+            return false;
+        }
+
+        double scale = 1 / dimension.dimensionType().coordinateScale();
+
+        TeleportCommand.performTeleport(
+            entity.createCommandSourceStack(),
+            entity,
+            dimension,
+            waypoint.pos().getX() * scale + 0.5,
+            waypoint.pos().getY(),
+            waypoint.pos().getZ() * scale + 0.5,
+            Collections.emptySet(),
+            entity.getYRot(),
+            entity.getXRot(),
+            null
+        );
+
+        return true;
     }
 }

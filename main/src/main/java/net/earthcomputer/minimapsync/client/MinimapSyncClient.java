@@ -77,6 +77,10 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
     }
 
+    public static boolean isCompatibleServer() {
+        return ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT);
+    }
+
     private static void initModel(ClientPacketListener handler, Model model) {
         Model.set(handler, model);
         for (IMinimapCompat compat : COMPATS) {

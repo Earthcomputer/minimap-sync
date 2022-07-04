@@ -9,6 +9,8 @@
   ],
   "client": [
     "ClientPacketListenerMixin",
+    "voxelmap.GuiPersistentMapMixin",
+    "voxelmap.GuiWaypointsMixin",
     "voxelmap.WaypointManagerMixin"
   ],
   "injectors": {
