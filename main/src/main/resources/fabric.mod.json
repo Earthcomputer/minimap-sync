@@ -24,7 +24,6 @@
   ],
   "accessWidener": "minimapsync.accesswidener",
   "depends": {
-    "fabricloader": ">=0.14.8",
     "fabric": "*",
     "minecraft": ">=1.17"
   }
