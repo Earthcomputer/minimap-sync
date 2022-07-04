@@ -187,12 +187,12 @@ public class WaypointCommand {
                             "color": "gold",
                             "clickEvent": {
                                 "action": "run_command",
-                                "value": "/waypoint tp %s"
+                                "value": "/waypoint tp \\"%s\\" %s"
                             }
                         }
                     ]
                 """;
-                    teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()));
+                    teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()), dimension.location());
                     teleportStr = "," + teleportStr;
                 }
                 source.sendSuccess(MinimapSync.createComponent("""
