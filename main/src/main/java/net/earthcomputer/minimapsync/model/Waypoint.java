@@ -7,13 +7,15 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 public record Waypoint(
     String name,
     @Nullable String description,
     int color,
-    ResourceKey<Level> dimension,
+    Set<ResourceKey<Level>> dimensions,
     BlockPos pos,
     @Nullable UUID author,
     @Nullable String authorName
@@ -23,7 +25,7 @@ public record Waypoint(
             buf.readUtf(256),
             buf.readBoolean() ? buf.readUtf() : null,
             buf.readInt(),
-            ResourceKey.create(Registry.DIMENSION_REGISTRY, buf.readResourceLocation()),
+            buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation())),
             buf.readBlockPos(),
             buf.readBoolean() ? buf.readUUID() : null,
             buf.readBoolean() ? buf.readUtf(16) : null
@@ -37,7 +39,7 @@ public record Waypoint(
             buf.writeUtf(description);
         }
         buf.writeInt(color);
-        buf.writeResourceLocation(dimension.location());
+        buf.writeCollection(dimensions, (buf1, dimension) -> buf1.writeResourceLocation(dimension.location()));
         buf.writeBlockPos(pos);
         buf.writeBoolean(author != null);
         if (author != null) {
@@ -50,22 +52,22 @@ public record Waypoint(
     }
 
     public Waypoint withDescription(@Nullable String description) {
-        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 
     public Waypoint withPos(BlockPos pos) {
-        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 
     public Waypoint withColor(int color) {
-        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 
     public Waypoint withAuthor(@Nullable UUID author) {
-        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 
     public Waypoint withAuthorName(@Nullable String authorName) {
-        return new Waypoint(name, description, color, dimension, pos, author, authorName);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 }

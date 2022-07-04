@@ -13,27 +13,31 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.commands.TeleportCommand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.commands.Commands.*;
+import static net.minecraft.commands.arguments.DimensionArgument.*;
 import static net.minecraft.commands.arguments.GameProfileArgument.*;
 import static net.minecraft.commands.arguments.coordinates.BlockPosArgument.*;
 
@@ -42,7 +46,6 @@ public class WaypointCommand {
     private static final DynamicCommandExceptionType NO_SUCH_WAYPOINT_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("No such waypoint: " + name));
     private static final SimpleCommandExceptionType NO_WAYPOINTS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("No waypoints found"));
     private static final SimpleCommandExceptionType CANNOT_TELEPORT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("No permission to teleport"));
-    private static final SimpleCommandExceptionType DIMENSION_NO_LONGER_EXISTS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Dimension no longer exists"));
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(literal("waypoint")
@@ -72,7 +75,9 @@ public class WaypointCommand {
                     })))
             .then(literal("tp")
                 .then(argument("name", string())
-                    .executes(ctx -> tpWaypoint(ctx.getSource(), getString(ctx, "name")))))
+                    .executes(ctx -> tpWaypoint(ctx.getSource(), getString(ctx, "name"), ctx.getSource().getLevel()))
+                    .then(argument("dimension", dimension())
+                        .executes(ctx -> tpWaypoint(ctx.getSource(), getString(ctx, "name"), getDimension(ctx, "dimension"))))))
             .then(literal("config")
                 .then(literal("teleport")
                     .requires(src -> src.hasPermission(2))
@@ -99,7 +104,7 @@ public class WaypointCommand {
             name,
             description,
             color,
-            source.getLevel().dimension(),
+            new LinkedHashSet<>(List.of(source.getLevel().dimension())),
             pos,
             uuid,
             entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null
@@ -146,11 +151,14 @@ public class WaypointCommand {
         Entity entity = source.getEntity();
         boolean canTeleport = entity instanceof ServerPlayer player && model.teleportRule().canTeleport(player);
 
-        waypoints.stream().collect(Collectors.groupingBy(
-            Waypoint::dimension,
-            () -> new TreeMap<>(Comparator.comparing(dim -> dim.location().toString())),
-            Collectors.toList())
-        ).forEach((dimension, wpts) -> {
+        Map<ResourceKey<Level>, List<Waypoint>> waypointsByDimension = new HashMap<>();
+        for (Waypoint waypoint : waypoints) {
+            for (ResourceKey<Level> dimension : waypoint.dimensions()) {
+                waypointsByDimension.computeIfAbsent(dimension, k -> new ArrayList<>()).add(waypoint);
+            }
+        }
+
+        waypointsByDimension.forEach((dimension, wpts) -> {
             source.sendSuccess(MinimapSync.createComponent("""
                 {"text": "in %s", "color": "green"}
             """, dimension.location()), false);
@@ -211,7 +219,7 @@ public class WaypointCommand {
         return waypoints.size();
     }
 
-    private static int tpWaypoint(CommandSourceStack source, String name) throws CommandSyntaxException {
+    private static int tpWaypoint(CommandSourceStack source, String name, ServerLevel dimension) throws CommandSyntaxException {
         Entity entity = source.getEntity();
         MinecraftServer server = source.getServer();
         Model model = Model.get(server);
@@ -223,17 +231,15 @@ public class WaypointCommand {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
-        ServerLevel level = server.getLevel(waypoint.dimension());
-        if (level == null) {
-            throw DIMENSION_NO_LONGER_EXISTS_EXCEPTION.create();
-        }
+        double scale = 1 / dimension.dimensionType().coordinateScale();
+
         TeleportCommand.performTeleport(
             source,
             entity,
-            level,
-            waypoint.pos().getX() + 0.5,
+            dimension,
+            waypoint.pos().getX() * scale + 0.5,
             waypoint.pos().getY(),
-            waypoint.pos().getZ() + 0.5,
+            waypoint.pos().getZ() * scale + 0.5,
             Collections.emptySet(),
             entity.getYRot(),
             entity.getXRot(),
