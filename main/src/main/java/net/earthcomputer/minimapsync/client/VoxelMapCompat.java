@@ -15,7 +15,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,14 +36,30 @@ public enum VoxelMapCompat implements IMinimapCompat {
     private int tickCounter = 0;
     private final List<Waypoint> serverKnownWaypoints = new ArrayList<>();
 
+    private static double getCoordinateScale(ResourceKey<Level> dimension) {
+        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        if (connection != null) {
+            DimensionType dimensionType = connection.registryAccess()
+                .registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY)
+                .get(dimension.location());
+            if (dimensionType != null) {
+                return dimensionType.coordinateScale();
+            }
+        }
+
+        return 1;
+    }
+
     private static com.mamiyaotaru.voxelmap.util.Waypoint toVoxel(Waypoint waypoint) {
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
         DimensionContainer currentDimension = dimensionManager.getDimensionContainerByIdentifier(waypoint.dimension().location().toString());
+        double scale = getCoordinateScale(waypoint.dimension());
+
         return new com.mamiyaotaru.voxelmap.util.Waypoint(
             waypoint.name(),
-            waypoint.pos().getX(),
-            waypoint.pos().getZ(),
+            Mth.floor(waypoint.pos().getX() * scale),
+            Mth.floor(waypoint.pos().getZ() * scale),
             waypoint.pos().getY(),
             true,
             ((waypoint.color() >> 16) & 0xff) / 255f,
@@ -57,12 +75,13 @@ public enum VoxelMapCompat implements IMinimapCompat {
         ResourceKey<Level> dimension = waypoint.dimensions.isEmpty()
             ? Level.OVERWORLD
             : ResourceKey.create(Registry.DIMENSION_REGISTRY, waypoint.dimensions.iterator().next().resourceLocation);
+        double scale = 1 / getCoordinateScale(dimension);
         return new Waypoint(
             waypoint.name,
             null,
             (((int) (waypoint.red * 255) & 0xff) << 16) | (((int) (waypoint.green * 255) & 0xff) << 8) | ((int) (waypoint.blue * 255) & 0xff),
             dimension,
-            new BlockPos(waypoint.x, waypoint.y, waypoint.z),
+            new BlockPos(Mth.floor(waypoint.x * scale), waypoint.y, Mth.floor(waypoint.z * scale)),
             Minecraft.getInstance().getUser().getGameProfile().getId(),
             Minecraft.getInstance().getUser().getGameProfile().getName()
         );
