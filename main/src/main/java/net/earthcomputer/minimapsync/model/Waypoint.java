@@ -55,6 +55,10 @@ public record Waypoint(
         return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }
 
+    public Waypoint withDimensions(Set<ResourceKey<Level>> dimensions) {
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName);
+    }
+
     public Waypoint withPos(BlockPos pos) {
         return new Waypoint(name, description, color, dimensions, pos, author, authorName);
     }

@@ -15,10 +15,15 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Environment(EnvType.CLIENT)
 public class MinimapSyncClient implements ClientModInitializer {
@@ -45,6 +50,11 @@ public class MinimapSyncClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_WAYPOINT, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             client.execute(() -> removeWaypoint(null, handler, name));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DIMENSIONS, (client, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            Set<ResourceKey<Level>> dimensions = buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation()));
+            client.execute(() -> setWaypointDimensions(null, handler, name, dimensions));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_POS, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
@@ -105,6 +115,22 @@ public class MinimapSyncClient implements ClientModInitializer {
                 try {
                     currentIgnore = compat;
                     compat.removeWaypoint(handler, name);
+                } finally {
+                    currentIgnore = prevIgnore;
+                }
+            }
+        }
+    }
+
+    private static void setWaypointDimensions(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions) {
+        Model model = Model.get(handler);
+        model.waypoints().setWaypointDimensions(name, dimensions);
+        for (IMinimapCompat compat : COMPATS) {
+            if (compat != source) {
+                IMinimapCompat prevIgnore = currentIgnore;
+                try {
+                    currentIgnore = compat;
+                    compat.setWaypointDimensions(handler, name, dimensions);
                 } finally {
                     currentIgnore = prevIgnore;
                 }
@@ -204,6 +230,21 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
+    public static void onSetWaypointDimensions(IMinimapCompat source, Waypoint waypoint) {
+        if (source == currentIgnore) {
+            return;
+        }
+
+        setWaypointDimensions(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.dimensions());
+
+        if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_DIMENSIONS)) {
+            FriendlyByteBuf buf = PacketByteBufs.create();
+            buf.writeUtf(waypoint.name(), 256);
+            buf.writeCollection(waypoint.dimensions(), (buf1, dim) -> buf1.writeResourceLocation(dim.location()));
+            ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_DIMENSIONS, buf);
+        }
+    }
+
     public static void onSetWaypointPos(IMinimapCompat source, Waypoint waypoint) {
         if (source == currentIgnore) {
             return;
@@ -213,7 +254,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_POS)) {
             FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name());
+            buf.writeUtf(waypoint.name(), 256);
             buf.writeBlockPos(waypoint.pos());
             ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_POS, buf);
         }
@@ -228,7 +269,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_COLOR)) {
             FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name());
+            buf.writeUtf(waypoint.name(), 256);
             buf.writeInt(waypoint.color());
             ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_COLOR, buf);
         }

@@ -36,6 +36,10 @@ public enum VoxelMapCompat implements IMinimapCompat {
     private int tickCounter = 0;
     private final List<Waypoint> serverKnownWaypoints = new ArrayList<>();
 
+    private static boolean isDeathpoint(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
+        return waypoint.imageSuffix.equals("skull");
+    }
+
     private static com.mamiyaotaru.voxelmap.util.Waypoint toVoxel(Waypoint waypoint) {
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
@@ -79,6 +83,10 @@ public enum VoxelMapCompat implements IMinimapCompat {
         var voxelWaypoints = AbstractVoxelMap.getInstance().getWaypointManager().getWaypoints();
         var serverWaypoints = serverKnownWaypoints.stream().collect(Collectors.toMap(Waypoint::name, Function.identity()));
         for (var voxelWaypoint : voxelWaypoints) {
+            if (isDeathpoint(voxelWaypoint)) {
+                continue;
+            }
+
             var serverWaypoint = serverWaypoints.remove(voxelWaypoint.name);
             if (serverWaypoint == null) {
                 serverWaypoint = fromVoxel(voxelWaypoint);
@@ -89,11 +97,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
                     .map(dim -> ResourceKey.create(Registry.DIMENSION_REGISTRY, dim.resourceLocation))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
                 if (!voxelDimensions.equals(serverWaypoint.dimensions())) {
-                    serverKnownWaypoints.removeIf(waypoint -> waypoint.name().equals(voxelWaypoint.name));
-                    MinimapSyncClient.onRemoveWaypoint(this, serverWaypoint);
-                    serverWaypoint = fromVoxel(voxelWaypoint);
-                    serverKnownWaypoints.add(serverWaypoint);
-                    MinimapSyncClient.onAddWaypoint(this, serverWaypoint);
+                    serverWaypoint = serverWaypoint.withDimensions(voxelDimensions);
+                    MinimapSyncClient.onSetWaypointDimensions(this, serverWaypoint);
                 }
 
                 if (voxelWaypoint.x != serverWaypoint.pos().getX() || voxelWaypoint.y != serverWaypoint.pos().getY() || voxelWaypoint.z != serverWaypoint.pos().getZ()) {
@@ -122,7 +127,9 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         for (var waypoint : new ArrayList<>(waypointManager.getWaypoints())) {
-            waypointManager.deleteWaypoint(waypoint);
+            if (!isDeathpoint(waypoint)) {
+                waypointManager.deleteWaypoint(waypoint);
+            }
         }
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
             waypointManager.addWaypoint(toVoxel(waypoint));
@@ -138,7 +145,9 @@ public enum VoxelMapCompat implements IMinimapCompat {
             waypoints.put(waypoint.name, waypoint);
         }
         for (var waypoint : waypoints.values()) {
-            waypointManager.deleteWaypoint(waypoint);
+            if (!isDeathpoint(waypoint)) {
+                waypointManager.deleteWaypoint(waypoint);
+            }
         }
 
         for (var serverWaypoint : serverKnownWaypoints) {
@@ -177,6 +186,31 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
         waypointManager.saveWaypoints();
+    }
+
+    @Override
+    public void setWaypointDimensions(ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions) {
+        for (int i = 0; i < serverKnownWaypoints.size(); i++) {
+            Waypoint serverWaypoint = serverKnownWaypoints.get(i);
+            if (name.equals(serverWaypoint.name())) {
+                serverKnownWaypoints.set(i, serverWaypoint.withDimensions(dimensions));
+            }
+        }
+
+        IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
+        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        boolean changed = false;
+        for (var waypoint : waypointManager.getWaypoints()) {
+            if (name.equals(waypoint.name)) {
+                waypoint.dimensions = dimensions.stream()
+                    .map(dim -> dimensionManager.getDimensionContainerByIdentifier(dim.location().toString()))
+                    .collect(Collectors.toCollection(TreeSet::new));
+                changed = true;
+            }
+        }
+        if (changed) {
+            waypointManager.saveWaypoints();
+        }
     }
 
     @Override

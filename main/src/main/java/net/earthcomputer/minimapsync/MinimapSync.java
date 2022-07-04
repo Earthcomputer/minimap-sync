@@ -10,21 +10,27 @@ import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.S2CPlayChannelEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 public class MinimapSync implements ModInitializer {
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
     public static final ResourceLocation ADD_WAYPOINT = new ResourceLocation("minimapsync:add_waypoint");
     public static final ResourceLocation REMOVE_WAYPOINT = new ResourceLocation("minimapsync:remove_waypoint");
+    public static final ResourceLocation SET_WAYPOINT_DIMENSIONS = new ResourceLocation("minimapsync:set_waypoint_dimensions");
     public static final ResourceLocation SET_WAYPOINT_POS = new ResourceLocation("minimapsync:set_waypoint_pos");
     public static final ResourceLocation SET_WAYPOINT_COLOR = new ResourceLocation("minimapsync:set_waypoint_color");
     public static final ResourceLocation SET_WAYPOINT_DESCRIPTION = new ResourceLocation("minimapsync:set_waypoint_description");
@@ -53,6 +59,11 @@ public class MinimapSync implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_WAYPOINT, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             server.execute(() -> delWaypoint(player, server, name));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_DIMENSIONS, (server, player, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            Set<ResourceKey<Level>> dimensions = buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation()));
+            server.execute(() -> setWaypointDimensions(player, server, name, dimensions));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_POS, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
@@ -101,6 +112,26 @@ public class MinimapSync implements ModInitializer {
         Packet<?> packet = ServerPlayNetworking.createS2CPacket(REMOVE_WAYPOINT, buf);
         for (ServerPlayer player : PlayerLookup.all(server)) {
             if (player != source && ServerPlayNetworking.canSend(player, REMOVE_WAYPOINT)) {
+                player.connection.send(packet);
+            }
+        }
+
+        return true;
+    }
+
+    private boolean setWaypointDimensions(@Nullable ServerPlayer source, MinecraftServer server, String name, Set<ResourceKey<Level>> dimensions) {
+        Model model = Model.get(server);
+        if (!model.waypoints().setWaypointDimensions(name, dimensions)) {
+            return false;
+        }
+        model.save(server);
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(name, 256);
+        buf.writeCollection(dimensions, (buf1, dimension) -> buf1.writeResourceLocation(dimension.location()));
+        Packet<?> packet = ServerPlayNetworking.createS2CPacket(SET_WAYPOINT_DIMENSIONS, buf);
+        for (ServerPlayer player : PlayerLookup.all(server)) {
+            if (player != source && ServerPlayNetworking.canSend(player, SET_WAYPOINT_DIMENSIONS)) {
                 player.connection.send(packet);
             }
         }

@@ -2,10 +2,13 @@ package net.earthcomputer.minimapsync.model;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -48,6 +51,17 @@ public final class WaypointList {
         for (Waypoint waypoint : waypoints) {
             if (waypoint.name().equals(name)) {
                 waypoints.remove(waypoint);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setWaypointDimensions(String name, Set<ResourceKey<Level>> dimensions) {
+        for (int i = 0; i < waypoints.size(); i++) {
+            Waypoint waypoint = waypoints.get(i);
+            if (waypoint.name().equals(name)) {
+                waypoints.set(i, waypoint.withDimensions(dimensions));
                 return true;
             }
         }
