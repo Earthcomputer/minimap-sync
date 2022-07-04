@@ -36,6 +36,7 @@ public record Model(
         .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
         .registerTypeAdapterFactory(RecordTypeAdapterFactory.builder().allowMissingComponentValues().create())
         .disableHtmlEscaping()
+        .setPrettyPrinting()
         .create();
 
     public Model() {
