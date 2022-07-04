@@ -25,9 +25,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.commands.Commands.*;
@@ -138,30 +141,39 @@ public class WaypointCommand {
             throw NO_WAYPOINTS_EXCEPTION.create();
         }
         source.sendSuccess(MinimapSync.createComponent("""
-            {"text": "=== List of current waypoints ===", "color": "red", "bold": "true"}
+            {"text": "=== List of current waypoints ===", "color": "aqua", "bold": "true"}
         """), false);
         Entity entity = source.getEntity();
         boolean canTeleport = entity instanceof ServerPlayer player && model.teleportRule().canTeleport(player);
 
-        for (Waypoint waypoint : waypoints) {
-            @Language("JSON") String authorStr;
-            if (waypoint.authorName() == null) {
-                authorStr = "";
-            } else {
-                authorStr = """
+        waypoints.stream().collect(Collectors.groupingBy(
+            Waypoint::dimension,
+            () -> new TreeMap<>(Comparator.comparing(dim -> dim.location().toString())),
+            Collectors.toList())
+        ).forEach((dimension, wpts) -> {
+            source.sendSuccess(MinimapSync.createComponent("""
+                {"text": "in %s", "color": "green"}
+            """, dimension.location()), false);
+
+            for (Waypoint waypoint : wpts) {
+                @Language("JSON") String authorStr;
+                if (waypoint.authorName() == null) {
+                    authorStr = "";
+                } else {
+                    authorStr = """
                     [
-                        " by ",
+                        {"text": " by ", "color": "gray", "bold": "true"},
                         {"text": "%s", "color": "gray"}
                     ]
                 """;
-                authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(waypoint.authorName()));
-                authorStr = "," + authorStr;
-            }
-            @Language("JSON") String teleportStr;
-            if (!canTeleport) {
-                teleportStr = "";
-            } else {
-                teleportStr = """
+                    authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(waypoint.authorName()));
+                    authorStr = "," + authorStr;
+                }
+                @Language("JSON") String teleportStr;
+                if (!canTeleport) {
+                    teleportStr = "";
+                } else {
+                    teleportStr = """
                     [
                         " ",
                         {
@@ -174,26 +186,27 @@ public class WaypointCommand {
                         }
                     ]
                 """;
-                teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()));
-                teleportStr = "," + teleportStr;
-            }
-            source.sendSuccess(MinimapSync.createComponent("""
+                    teleportStr = teleportStr.formatted(StringEscapeUtils.escapeJson(waypoint.name()));
+                    teleportStr = "," + teleportStr;
+                }
+                source.sendSuccess(MinimapSync.createComponent("""
                     [
                         "- ",
-                        {"text": "%s", "color": "#%06x"},
-                        {"text": " %d %d %d"}
+                        {"text": "%s", "color": "#%06x", "bold": "true"},
+                        {"text": ": %d %d %d"}
                         %s%s
                     ]
                 """,
-                StringEscapeUtils.escapeJson(waypoint.name()),
-                waypoint.color(),
-                waypoint.pos().getX(),
-                waypoint.pos().getY(),
-                waypoint.pos().getZ(),
-                authorStr,
-                teleportStr
-            ), false);
-        }
+                    StringEscapeUtils.escapeJson(waypoint.name()),
+                    waypoint.color(),
+                    waypoint.pos().getX(),
+                    waypoint.pos().getY(),
+                    waypoint.pos().getZ(),
+                    authorStr,
+                    teleportStr
+                ), false);
+            }
+        });
 
         return waypoints.size();
     }
