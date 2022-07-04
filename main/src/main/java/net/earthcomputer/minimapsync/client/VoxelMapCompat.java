@@ -20,7 +20,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -110,8 +112,10 @@ public enum VoxelMapCompat implements IMinimapCompat {
                     MinimapSyncClient.onAddWaypoint(this, serverWaypoint);
                 }
 
-                if (voxelWaypoint.x != serverWaypoint.pos().getX() || voxelWaypoint.y != serverWaypoint.pos().getY() || voxelWaypoint.z != serverWaypoint.pos().getZ()) {
-                    serverWaypoint = serverWaypoint.withPos(new BlockPos(voxelWaypoint.x, voxelWaypoint.y, voxelWaypoint.z));
+                double scale = 1 / getCoordinateScale(serverWaypoint.dimension());
+
+                if (Mth.floor(voxelWaypoint.x * scale) != serverWaypoint.pos().getX() || voxelWaypoint.y != serverWaypoint.pos().getY() || Mth.floor(voxelWaypoint.z * scale) != serverWaypoint.pos().getZ()) {
+                    serverWaypoint = serverWaypoint.withPos(new BlockPos(Mth.floor(voxelWaypoint.x * scale), voxelWaypoint.y, Mth.floor(voxelWaypoint.z * scale)));
                     MinimapSyncClient.onSetWaypointPos(this, serverWaypoint);
                 }
 
@@ -144,6 +148,35 @@ public enum VoxelMapCompat implements IMinimapCompat {
         waypointManager.saveWaypoints();
     }
 
+    public void mergeWaypoints() {
+        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+
+        Map<String, com.mamiyaotaru.voxelmap.util.Waypoint> waypoints = new LinkedHashMap<>();
+        for (var waypoint : waypointManager.getWaypoints()) {
+            waypoints.put(waypoint.name, waypoint);
+        }
+        for (var waypoint : waypoints.values()) {
+            waypointManager.deleteWaypoint(waypoint);
+        }
+
+        for (var serverWaypoint : serverKnownWaypoints) {
+            var voxelWaypoint = waypoints.get(serverWaypoint.name());
+            var newVoxelWaypoint = toVoxel(serverWaypoint);
+            if (voxelWaypoint == null) {
+                waypointManager.addWaypoint(newVoxelWaypoint);
+            } else {
+                voxelWaypoint.dimensions = newVoxelWaypoint.dimensions;
+                voxelWaypoint.x = newVoxelWaypoint.x;
+                voxelWaypoint.y = newVoxelWaypoint.y;
+                voxelWaypoint.z = newVoxelWaypoint.z;
+                voxelWaypoint.red = newVoxelWaypoint.red;
+                voxelWaypoint.green = newVoxelWaypoint.green;
+                voxelWaypoint.blue = newVoxelWaypoint.blue;
+                waypointManager.addWaypoint(voxelWaypoint);
+            }
+        }
+    }
+
     @Override
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         serverKnownWaypoints.add(waypoint);
@@ -166,19 +199,26 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointPos(ClientPacketListener handler, String name, BlockPos pos) {
+        ResourceKey<Level> dimension = null;
         for (int i = 0; i < serverKnownWaypoints.size(); i++) {
             Waypoint serverWaypoint = serverKnownWaypoints.get(i);
             if (name.equals(serverWaypoint.name())) {
                 serverKnownWaypoints.set(i, serverWaypoint.withPos(pos));
+                dimension = serverWaypoint.dimension();
             }
         }
+        if (dimension == null) {
+            return;
+        }
+        double scale = getCoordinateScale(dimension);
+
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         boolean changed = false;
         for (var waypoint : waypointManager.getWaypoints()) {
             if (name.equals(waypoint.name)) {
-                waypoint.x = pos.getX();
+                waypoint.x = Mth.floor(pos.getX() * scale);
                 waypoint.y = pos.getY();
-                waypoint.z = pos.getZ();
+                waypoint.z = Mth.floor(pos.getZ() * scale);
                 changed = true;
             }
         }
