@@ -21,10 +21,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -87,6 +85,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
         var voxelWaypoints = AbstractVoxelMap.getInstance().getWaypointManager().getWaypoints();
         var serverWaypoints = serverKnownWaypoints.stream().collect(Collectors.toMap(Waypoint::name, Function.identity()));
+        boolean changed = false;
         for (var voxelWaypoint : voxelWaypoints) {
             if (isDeathpoint(voxelWaypoint)) {
                 continue;
@@ -95,8 +94,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
             var serverWaypoint = serverWaypoints.remove(voxelWaypoint.name);
             if (serverWaypoint == null) {
                 serverWaypoint = fromVoxel(voxelWaypoint);
-                serverKnownWaypoints.add(serverWaypoint);
                 MinimapSyncClient.onAddWaypoint(this, serverWaypoint);
+                changed = true;
             } else {
                 Set<ResourceKey<Level>> voxelDimensions = voxelWaypoint.dimensions.stream()
                     .map(dim -> ResourceKey.create(Registry.DIMENSION_REGISTRY, dim.resourceLocation))
@@ -104,24 +103,37 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 if (!voxelDimensions.equals(serverWaypoint.dimensions())) {
                     serverWaypoint = serverWaypoint.withDimensions(voxelDimensions);
                     MinimapSyncClient.onSetWaypointDimensions(this, serverWaypoint);
+                    changed = true;
                 }
 
                 if (voxelWaypoint.x != serverWaypoint.pos().getX() || voxelWaypoint.y != serverWaypoint.pos().getY() || voxelWaypoint.z != serverWaypoint.pos().getZ()) {
                     serverWaypoint = serverWaypoint.withPos(new BlockPos(voxelWaypoint.x, voxelWaypoint.y, voxelWaypoint.z));
                     MinimapSyncClient.onSetWaypointPos(this, serverWaypoint);
+                    changed = true;
                 }
 
                 int color = (((int) (voxelWaypoint.red * 255) & 0xff) << 16) | (((int) (voxelWaypoint.green * 255) & 0xff) << 8) | ((int) (voxelWaypoint.blue * 255) & 0xff);
                 if (color != serverWaypoint.color()) {
                     serverWaypoint = serverWaypoint.withColor(color);
                     MinimapSyncClient.onSetWaypointColor(this, serverWaypoint);
+                    changed = true;
                 }
             }
         }
 
         for (Waypoint removedWaypoint : serverWaypoints.values()) {
-            serverKnownWaypoints.remove(removedWaypoint);
             MinimapSyncClient.onRemoveWaypoint(this, removedWaypoint);
+            changed = true;
+        }
+
+        if (changed) {
+            serverKnownWaypoints.clear();
+            for (var waypoint : voxelWaypoints) {
+                if (isDeathpoint(waypoint)) {
+                    continue;
+                }
+                serverKnownWaypoints.add(fromVoxel(waypoint));
+            }
         }
     }
 
@@ -145,22 +157,22 @@ public enum VoxelMapCompat implements IMinimapCompat {
     public void mergeWaypoints() {
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
 
-        Map<String, com.mamiyaotaru.voxelmap.util.Waypoint> waypoints = new LinkedHashMap<>();
-        for (var waypoint : waypointManager.getWaypoints()) {
-            waypoints.put(waypoint.name, waypoint);
-        }
-        for (var waypoint : waypoints.values()) {
-            if (!isDeathpoint(waypoint)) {
-                waypointManager.deleteWaypoint(waypoint);
+        var waypoints = waypointManager.getWaypoints().stream().collect(Collectors.groupingBy(waypoint -> waypoint.name));
+        for (var wpts : waypoints.values()) {
+            for (var waypoint : wpts) {
+                if (!isDeathpoint(waypoint)) {
+                    waypointManager.deleteWaypoint(waypoint);
+                }
             }
         }
 
         for (var serverWaypoint : serverKnownWaypoints) {
-            var voxelWaypoint = waypoints.get(serverWaypoint.name());
+            var voxelWpts = waypoints.get(serverWaypoint.name());
             var newVoxelWaypoint = toVoxel(serverWaypoint);
-            if (voxelWaypoint == null) {
+            if (voxelWpts == null || voxelWpts.isEmpty()) {
                 waypointManager.addWaypoint(newVoxelWaypoint);
             } else {
+                var voxelWaypoint = voxelWpts.get(0);
                 voxelWaypoint.dimensions = newVoxelWaypoint.dimensions;
                 voxelWaypoint.x = newVoxelWaypoint.x;
                 voxelWaypoint.y = newVoxelWaypoint.y;
