@@ -21,6 +21,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -83,7 +84,17 @@ public enum VoxelMapCompat implements IMinimapCompat {
             return;
         }
 
-        var voxelWaypoints = AbstractVoxelMap.getInstance().getWaypointManager().getWaypoints();
+        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+
+        // delete duplicate waypoints
+        Set<String> seenNames = new HashSet<>();
+        for (var voxelWaypoint : new ArrayList<>(waypointManager.getWaypoints())) {
+            if (!seenNames.add(voxelWaypoint.name)) {
+                waypointManager.deleteWaypoint(voxelWaypoint);
+            }
+        }
+
+        var voxelWaypoints = waypointManager.getWaypoints();
         var serverWaypoints = serverKnownWaypoints.stream().collect(Collectors.toMap(Waypoint::name, Function.identity()));
         boolean changed = false;
         for (var voxelWaypoint : voxelWaypoints) {
