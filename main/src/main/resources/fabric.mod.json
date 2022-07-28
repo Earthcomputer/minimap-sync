@@ -26,5 +26,13 @@
   "depends": {
     "fabric": "*",
     "minecraft": ">=1.17"
+  },
+  "custom": {
+    "multiconnect": {
+      "custom_payloads": {
+        "allowed_clientbound": "minimapsync:*",
+        "allowed_serverbound": "minimapsync:*"
+      }
+    }
   }
 }
