@@ -1,5 +1,6 @@
 package net.earthcomputer.minimapsync.model;
 
+import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
@@ -20,11 +21,11 @@ public final class WaypointList {
     }
 
     public WaypointList(FriendlyByteBuf buf) {
-        waypoints = buf.readList(Waypoint::new);
+        waypoints = FriendlyByteBufUtil.readList(buf, Waypoint::new);
     }
 
     public void toPacket(FriendlyByteBuf buf) {
-        buf.writeCollection(waypoints, (buf2, waypoint) -> waypoint.toPacket(buf2));
+        FriendlyByteBufUtil.writeCollection(buf, waypoints, (buf2, waypoint) -> waypoint.toPacket(buf2));
     }
 
     @Nullable

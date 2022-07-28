@@ -1,6 +1,7 @@
 package net.earthcomputer.minimapsync.client;
 
 import com.google.common.collect.ImmutableList;
+import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
@@ -53,7 +54,7 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DIMENSIONS, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            Set<ResourceKey<Level>> dimensions = buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation()));
+            Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY));
             client.execute(() -> setWaypointDimensions(null, handler, name, dimensions));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_POS, (client, handler, buf, responseSender) -> {
@@ -68,7 +69,7 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DESCRIPTION, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            String description = buf.readBoolean() ? buf.readUtf() : null;
+            String description = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
             client.execute(() -> setWaypointDescription(null, handler, name, description));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_TELEPORT_RULE, (client, handler, buf, responseSender) -> {
@@ -244,7 +245,7 @@ public class MinimapSyncClient implements ClientModInitializer {
         if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_DIMENSIONS)) {
             FriendlyByteBuf buf = PacketByteBufs.create();
             buf.writeUtf(waypoint.name(), 256);
-            buf.writeCollection(waypoint.dimensions(), (buf1, dim) -> buf1.writeResourceLocation(dim.location()));
+            FriendlyByteBufUtil.writeCollection(buf, waypoint.dimensions(), FriendlyByteBufUtil::writeResourceKey);
             ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_DIMENSIONS, buf);
         }
     }

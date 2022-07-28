@@ -1,5 +1,6 @@
 package net.earthcomputer.minimapsync.model;
 
+import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
@@ -23,32 +24,23 @@ public record Waypoint(
     public Waypoint(FriendlyByteBuf buf) {
         this(
             buf.readUtf(256),
-            buf.readBoolean() ? buf.readUtf() : null,
+            FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf),
             buf.readInt(),
-            buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation())),
+            FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY)),
             buf.readBlockPos(),
-            buf.readBoolean() ? buf.readUUID() : null,
-            buf.readBoolean() ? buf.readUtf(16) : null
+            FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUUID),
+            FriendlyByteBufUtil.readNullable(buf, buf1 -> buf1.readUtf(16))
         );
     }
 
     public void toPacket(FriendlyByteBuf buf) {
         buf.writeUtf(name, 256);
-        buf.writeBoolean(description != null);
-        if (description != null) {
-            buf.writeUtf(description);
-        }
+        FriendlyByteBufUtil.writeNullable(buf, description, FriendlyByteBuf::writeUtf);
         buf.writeInt(color);
-        buf.writeCollection(dimensions, (buf1, dimension) -> buf1.writeResourceLocation(dimension.location()));
+        FriendlyByteBufUtil.writeCollection(buf, dimensions, FriendlyByteBufUtil::writeResourceKey);
         buf.writeBlockPos(pos);
-        buf.writeBoolean(author != null);
-        if (author != null) {
-            buf.writeUUID(author);
-        }
-        buf.writeBoolean(authorName != null);
-        if (authorName != null) {
-            buf.writeUtf(authorName, 16);
-        }
+        FriendlyByteBufUtil.writeNullable(buf, author, FriendlyByteBuf::writeUUID);
+        FriendlyByteBufUtil.writeNullable(buf, authorName, (buf1, authorName) -> buf1.writeUtf(authorName, 16));
     }
 
     public Waypoint withDescription(@Nullable String description) {

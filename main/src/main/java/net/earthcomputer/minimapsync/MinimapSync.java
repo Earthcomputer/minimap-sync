@@ -68,7 +68,7 @@ public class MinimapSync implements ModInitializer {
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_DIMENSIONS, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            Set<ResourceKey<Level>> dimensions = buf.readCollection(LinkedHashSet::new, buf1 -> ResourceKey.create(Registry.DIMENSION_REGISTRY, buf1.readResourceLocation()));
+            Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY));
             server.execute(() -> setWaypointDimensions(player, server, name, dimensions));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_POS, (server, player, handler, buf, responseSender) -> {
@@ -83,7 +83,7 @@ public class MinimapSync implements ModInitializer {
         });
         ServerPlayNetworking.registerGlobalReceiver(TELEPORT, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            ResourceLocation dimensionId = buf.readBoolean() ? buf.readResourceLocation() : null;
+            ResourceLocation dimensionId = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readResourceLocation);
             server.execute(() -> {
                 if (Model.get(server).teleportRule().canTeleport(player)) {
                     ServerLevel level = dimensionId == null
@@ -151,7 +151,7 @@ public class MinimapSync implements ModInitializer {
 
         FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeUtf(name, 256);
-        buf.writeCollection(dimensions, (buf1, dimension) -> buf1.writeResourceLocation(dimension.location()));
+        FriendlyByteBufUtil.writeCollection(buf, dimensions, FriendlyByteBufUtil::writeResourceKey);
         Packet<?> packet = ServerPlayNetworking.createS2CPacket(SET_WAYPOINT_DIMENSIONS, buf);
         for (ServerPlayer player : PlayerLookup.all(server)) {
             if (player != source && ServerPlayNetworking.canSend(player, SET_WAYPOINT_DIMENSIONS)) {
@@ -211,10 +211,7 @@ public class MinimapSync implements ModInitializer {
 
         FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeUtf(name, 256);
-        buf.writeBoolean(description != null);
-        if (description != null) {
-            buf.writeUtf(description);
-        }
+        FriendlyByteBufUtil.writeNullable(buf, description, FriendlyByteBuf::writeUtf);
         Packet<?> packet = ServerPlayNetworking.createS2CPacket(SET_WAYPOINT_DESCRIPTION, buf);
         for (ServerPlayer player : PlayerLookup.all(server)) {
             if (ServerPlayNetworking.canSend(player, SET_WAYPOINT_DESCRIPTION)) {
