@@ -61,6 +61,9 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
         if (event instanceof WaypointEvent waypointEvent) {
             var waypoint = waypointEvent.waypoint;
+            if (isDeathPoint(waypoint)) {
+                return;
+            }
             switch (waypointEvent.context) {
                 case CREATE -> {
                     prevWaypoints.put(waypoint.getName(), toJourneyMap(fromJourneyMap(waypoint)));
