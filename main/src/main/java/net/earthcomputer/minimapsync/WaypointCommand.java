@@ -17,7 +17,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.StringEscapeUtils;
@@ -31,7 +30,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.commands.Commands.*;
@@ -95,8 +93,7 @@ public class WaypointCommand {
         Entity entity = source.getEntity();
         UUID uuid = entity == null ? null : entity.getUUID();
 
-        // generate color with random hue
-        int color = Mth.hsvToRgb(ThreadLocalRandom.current().nextFloat(), 1, 1);
+        int color = MinimapSync.randomColor();
 
         Waypoint waypoint = new Waypoint(
             name,

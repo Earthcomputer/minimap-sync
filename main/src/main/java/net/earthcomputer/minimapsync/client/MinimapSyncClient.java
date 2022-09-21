@@ -30,19 +30,35 @@ import java.util.Set;
 public class MinimapSyncClient implements ClientModInitializer {
     @Nullable
     private static IMinimapCompat currentIgnore;
-    private static final List<IMinimapCompat> COMPATS = Util.make(() -> {
-        var builder = ImmutableList.<IMinimapCompat>builder();
-        if (FabricLoader.getInstance().isModLoaded("voxelmap")) {
-            builder.add(VoxelMapCompat.INSTANCE.init());
-        }
-        return builder.build();
-    });
+
+    private static Model pendingLoginModel;
+
+    // wrap in inner class to lazily compute this value
+    private static class CompatsHolder {
+        private static final List<IMinimapCompat> COMPATS = Util.make(() -> {
+            FabricLoader loader = FabricLoader.getInstance();
+            var builder = ImmutableList.<IMinimapCompat>builder();
+            if (loader.isModLoaded("voxelmap")) {
+                builder.add(VoxelMapCompat.INSTANCE.init());
+            }
+            if (loader.isModLoaded("journeymap-api-fabric")) {
+                builder.add(JourneyMapCompat.instance());
+            }
+            return builder.build();
+        });
+    }
 
     @Override
     public void onInitializeClient() {
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, buf, responseSender) -> {
             Model model = new Model(buf);
-            client.execute(() -> initModel(handler, model));
+            client.execute(() -> {
+                if (Minecraft.getInstance().level == null) {
+                    pendingLoginModel = model;
+                } else {
+                    initModel(handler, model);
+                }
+            });
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_WAYPOINT, (client, handler, buf, responseSender) -> {
             Waypoint waypoint = new Waypoint(buf);
@@ -78,13 +94,21 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
     }
 
+    public static void onLogin() {
+        Model model = pendingLoginModel;
+        if (model != null) {
+            pendingLoginModel = null;
+            initModel(Minecraft.getInstance().getConnection(), model);
+        }
+    }
+
     public static boolean isCompatibleServer() {
         return ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT);
     }
 
     private static void initModel(ClientPacketListener handler, Model model) {
         Model.set(handler, model);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             IMinimapCompat prevIgnore = currentIgnore;
             try {
                 currentIgnore = compat;
@@ -98,7 +122,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void addWaypoint(@Nullable IMinimapCompat source, ClientPacketListener handler, Waypoint waypoint) {
         Model model = Model.get(handler);
         model.waypoints().addWaypoint(waypoint);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -114,7 +138,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void removeWaypoint(@Nullable IMinimapCompat source, ClientPacketListener handler, String name) {
         Model model = Model.get(handler);
         model.waypoints().removeWaypoint(name);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -130,7 +154,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void setWaypointDimensions(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions) {
         Model model = Model.get(handler);
         model.waypoints().setWaypointDimensions(name, dimensions);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -146,7 +170,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void setWaypointPos(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, BlockPos pos) {
         Model model = Model.get(handler);
         model.waypoints().setPos(name, pos);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -162,7 +186,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void setWaypointColor(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, int color) {
         Model model = Model.get(handler);
         model.waypoints().setColor(name, color);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -178,7 +202,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void setWaypointDescription(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, String description) {
         Model model = Model.get(handler);
         model.waypoints().setDescription(name, description);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -194,7 +218,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     private static void setWaypointTeleportRule(@Nullable IMinimapCompat source, ClientPacketListener handler, WaypointTeleportRule rule) {
         Model model = Model.get(handler).withTeleportRule(rule);
         Model.set(handler, model);
-        for (IMinimapCompat compat : COMPATS) {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
                 try {
@@ -221,16 +245,16 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
-    public static void onRemoveWaypoint(IMinimapCompat source, Waypoint waypoint) {
+    public static void onRemoveWaypoint(IMinimapCompat source, String name) {
         if (source == currentIgnore) {
             return;
         }
 
-        removeWaypoint(source, Minecraft.getInstance().getConnection(), waypoint.name());
+        removeWaypoint(source, Minecraft.getInstance().getConnection(), name);
 
         if (ClientPlayNetworking.canSend(MinimapSync.REMOVE_WAYPOINT)) {
             FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name(), 256);
+            buf.writeUtf(name, 256);
             ClientPlayNetworking.send(MinimapSync.REMOVE_WAYPOINT, buf);
         }
     }

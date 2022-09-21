@@ -17,6 +17,9 @@
     ],
     "main": [
       "net.earthcomputer.minimapsync.MinimapSync"
+    ],
+    "journeymap": [
+      "net.earthcomputer.minimapsync.client.JourneyMapCompat"
     ]
   },
   "mixins": [

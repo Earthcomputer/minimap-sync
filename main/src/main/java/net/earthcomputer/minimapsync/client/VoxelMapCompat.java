@@ -133,7 +133,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
         }
 
         for (Waypoint removedWaypoint : serverWaypoints.values()) {
-            MinimapSyncClient.onRemoveWaypoint(this, removedWaypoint);
+            MinimapSyncClient.onRemoveWaypoint(this, removedWaypoint.name());
             changed = true;
         }
 

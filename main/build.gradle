@@ -17,6 +17,10 @@ repositories {
         name = 'JitPack'
         url = 'https://jitpack.io/'
     }
+    maven {
+        name = 'DJTheRedstoner'
+        url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1/'
+    }
     flatDir {
         dirs rootProject.file('libs').absolutePath
     }
@@ -43,6 +47,10 @@ dependencies {
         if (file.name.endsWith('.jar')) {
             modImplementation "runtimemod:${file.name.substring(0, file.name.length() - 4)}:1.0"
         }
+    }
+
+    modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:1.1.0") {
+        exclude group: 'net.fabricmc', module: 'fabric-loader'
     }
 }
 

@@ -21,6 +21,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.commands.TeleportCommand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.intellij.lang.annotations.Language;
@@ -30,6 +31,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MinimapSync implements ModInitializer {
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
@@ -98,6 +100,11 @@ public class MinimapSync implements ModInitializer {
                 }
             });
         });
+    }
+
+    public static int randomColor() {
+        // generate color with random hue
+        return Mth.hsvToRgb(ThreadLocalRandom.current().nextFloat(), 1, 1);
     }
 
     public static Component createComponent(@Language("JSON") String json, Object... args) {
