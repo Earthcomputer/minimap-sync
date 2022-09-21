@@ -112,7 +112,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
     private static Waypoint fromJourneyMap(journeymap.client.api.display.Waypoint waypoint) {
         BlockPos pos = NETHER.equals(ResourceLocation.tryParse(waypoint.getDimension()))
-            ? new BlockPos(waypoint.getPosition().getX() * 8, waypoint.getPosition().getY(), waypoint.getPosition().getZ())
+            ? new BlockPos(waypoint.getPosition().getX() * 8, waypoint.getPosition().getY(), waypoint.getPosition().getZ() * 8)
             : waypoint.getPosition();
         return new Waypoint(
             waypoint.getName(),
