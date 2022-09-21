@@ -9,6 +9,7 @@ import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.loader.api.FabricLoader;
@@ -22,6 +23,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,7 +33,8 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Nullable
     private static IMinimapCompat currentIgnore;
 
-    private static Model pendingLoginModel;
+    private static boolean ready = false;
+    private static final List<Runnable> whenReady = new ArrayList<>();
 
     // wrap in inner class to lazily compute this value
     private static class CompatsHolder {
@@ -50,56 +53,72 @@ public class MinimapSyncClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            // VoxelMap is bad and late-initializes itself in the tick loop rather than on the join event.
+            // When VoxelMap is loaded, we hook into VoxelMap to call onReady() instead.
+            if (!FabricLoader.getInstance().isModLoaded("voxelmap")) {
+                MinimapSyncClient.onReady();
+            }
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            ready = false;
+            whenReady.clear();
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, buf, responseSender) -> {
             Model model = new Model(buf);
-            client.execute(() -> {
-                if (Minecraft.getInstance().level == null) {
-                    pendingLoginModel = model;
-                } else {
-                    initModel(handler, model);
-                }
-            });
+            client.execute(() -> whenReady(() -> initModel(handler, model)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_WAYPOINT, (client, handler, buf, responseSender) -> {
             Waypoint waypoint = new Waypoint(buf);
-            client.execute(() -> addWaypoint(null, handler, waypoint));
+            client.execute(() -> whenReady(() -> addWaypoint(null, handler, waypoint)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_WAYPOINT, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            client.execute(() -> removeWaypoint(null, handler, name));
+            client.execute(() -> whenReady(() -> removeWaypoint(null, handler, name)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DIMENSIONS, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY));
-            client.execute(() -> setWaypointDimensions(null, handler, name, dimensions));
+            client.execute(() -> whenReady(() -> setWaypointDimensions(null, handler, name, dimensions)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_POS, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             BlockPos pos = buf.readBlockPos();
-            client.execute(() -> setWaypointPos(null, handler, name, pos));
+            client.execute(() -> whenReady(() -> setWaypointPos(null, handler, name, pos)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_COLOR, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             int color = buf.readInt();
-            client.execute(() -> setWaypointColor(null, handler, name, color));
+            client.execute(() -> whenReady(() -> setWaypointColor(null, handler, name, color)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DESCRIPTION, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             String description = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
-            client.execute(() -> setWaypointDescription(null, handler, name, description));
+            client.execute(() -> whenReady(() -> setWaypointDescription(null, handler, name, description)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_TELEPORT_RULE, (client, handler, buf, responseSender) -> {
             WaypointTeleportRule rule = buf.readEnum(WaypointTeleportRule.class);
-            client.execute(() -> setWaypointTeleportRule(null, handler, rule));
+            client.execute(() -> whenReady(() -> setWaypointTeleportRule(null, handler, rule)));
         });
     }
 
-    public static void onLogin() {
-        Model model = pendingLoginModel;
-        if (model != null) {
-            pendingLoginModel = null;
-            initModel(Minecraft.getInstance().getConnection(), model);
+    private static void whenReady(Runnable runnable) {
+        if (ready) {
+            runnable.run();
+        } else {
+            whenReady.add(runnable);
         }
+    }
+
+    public static void onReady() {
+        if (ready) return;
+        ready = true;
+
+        for (Runnable runnable : whenReady) {
+            runnable.run();
+        }
+        whenReady.clear();
     }
 
     public static boolean isCompatibleServer() {

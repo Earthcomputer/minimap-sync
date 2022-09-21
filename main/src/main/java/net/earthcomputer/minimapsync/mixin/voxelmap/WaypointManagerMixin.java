@@ -4,10 +4,12 @@ import com.mamiyaotaru.voxelmap.WaypointManager;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.client.VoxelMapCompat;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
@@ -20,6 +22,13 @@ public class WaypointManagerMixin {
     private void onLoadWaypoints(CallbackInfoReturnable<Boolean> ci) {
         if (MinimapSyncClient.isCompatibleServer()) {
             VoxelMapCompat.INSTANCE.mergeWaypoints(this.wayPts);
+        }
+    }
+
+    @Inject(method = "newWorld", at = @At("RETURN"))
+    private void onNewWorld(Level level, CallbackInfo ci) {
+        if (level != null) {
+            MinimapSyncClient.onReady();
         }
     }
 }
