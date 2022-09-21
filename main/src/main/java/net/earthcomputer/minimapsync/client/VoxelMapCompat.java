@@ -165,23 +165,15 @@ public enum VoxelMapCompat implements IMinimapCompat {
         waypointManager.saveWaypoints();
     }
 
-    public void mergeWaypoints() {
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
-
-        var waypoints = waypointManager.getWaypoints().stream().collect(Collectors.groupingBy(waypoint -> waypoint.name));
-        for (var wpts : waypoints.values()) {
-            for (var waypoint : wpts) {
-                if (!isDeathpoint(waypoint)) {
-                    waypointManager.deleteWaypoint(waypoint);
-                }
-            }
-        }
+    public void mergeWaypoints(ArrayList<com.mamiyaotaru.voxelmap.util.Waypoint> wayPts) {
+        var waypoints = wayPts.stream().collect(Collectors.groupingBy(waypoint -> waypoint.name));
+        wayPts.removeIf(wp -> !isDeathpoint(wp));
 
         for (var serverWaypoint : serverKnownWaypoints) {
             var voxelWpts = waypoints.get(serverWaypoint.name());
             var newVoxelWaypoint = toVoxel(serverWaypoint);
             if (voxelWpts == null || voxelWpts.isEmpty()) {
-                waypointManager.addWaypoint(newVoxelWaypoint);
+                wayPts.add(newVoxelWaypoint);
             } else {
                 var voxelWaypoint = voxelWpts.get(0);
                 voxelWaypoint.dimensions = newVoxelWaypoint.dimensions;
@@ -191,7 +183,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 voxelWaypoint.red = newVoxelWaypoint.red;
                 voxelWaypoint.green = newVoxelWaypoint.green;
                 voxelWaypoint.blue = newVoxelWaypoint.blue;
-                waypointManager.addWaypoint(voxelWaypoint);
+                wayPts.add(voxelWaypoint);
             }
         }
     }
