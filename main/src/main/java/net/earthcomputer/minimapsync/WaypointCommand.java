@@ -73,6 +73,8 @@ public class WaypointCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(literal("waypoint")
+            .then(literal("reload")
+                .executes(ctx -> reloadModel(ctx.getSource())))
             .then(literal("add")
                 .then(argument("name", string())
                     .executes(ctx -> addWaypoint(ctx.getSource(), getString(ctx, "name"), new BlockPos(ctx.getSource().getPosition()), null))
@@ -132,6 +134,12 @@ public class WaypointCommand {
                 .then(literal("unset")
                     .then(argument("waypoint", string())
                         .executes(ctx -> unsetWaypointIcon(ctx.getSource(), getString(ctx, "waypoint")))))));
+    }
+
+    private static int reloadModel(CommandSourceStack source) {
+        Model.set(source.getServer(), Model.load(source.getServer()));
+        source.sendSuccess(Component.nullToEmpty("Reloaded minimap model"), true);
+        return Command.SINGLE_SUCCESS;
     }
 
     private static int addWaypoint(CommandSourceStack source, String name, BlockPos pos, @Nullable String description) throws CommandSyntaxException {
