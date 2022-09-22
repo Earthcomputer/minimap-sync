@@ -147,7 +147,12 @@ public class MinimapSync implements ModInitializer {
                 if (!ArrayUtils.contains(originatingProvider.getFormatNames(), "PNG")) {
                     return;
                 }
-                if (imageReader.getWidth(0) != Waypoint.ICON_DIMENSIONS || imageReader.getHeight(0) != Waypoint.ICON_DIMENSIONS) {
+                int width = imageReader.getWidth(0);
+                int height = imageReader.getHeight(0);
+                if (width != height
+                    || width < Waypoint.MIN_ICON_DIMENSIONS
+                    || width > Waypoint.MAX_ICON_DIMENSIONS
+                    || !Mth.isPowerOfTwo(width)) {
                     return;
                 }
             } catch (IOException e) {

@@ -18,6 +18,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.StringEscapeUtils;
@@ -67,7 +68,7 @@ public class WaypointCommand {
     private static final SimpleCommandExceptionType UNKNOWN_HOST_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Couldn't connect to URL: unknown host"));
     private static final Dynamic2CommandExceptionType COULDNT_CONNECT_STATUS_CODE_EXCEPTION = new Dynamic2CommandExceptionType((code, desc) -> Component.nullToEmpty("Couldn't connect to URL: HTTP " + code + " " + desc));
     private static final SimpleCommandExceptionType IMAGE_TOO_LARGE_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Image too large, must be at most " + MAX_IMAGE_SIZE_STRING));
-    private static final SimpleCommandExceptionType WRONG_IMAGE_DIMENSIONS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Wrong image dimensions: expected " + Waypoint.ICON_DIMENSIONS + "x" + Waypoint.ICON_DIMENSIONS + " pixels"));
+    private static final SimpleCommandExceptionType WRONG_IMAGE_DIMENSIONS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Wrong image dimensions: expected a square power of 2 between " + Waypoint.MIN_ICON_DIMENSIONS + "x" + Waypoint.MIN_ICON_DIMENSIONS + " and " + Waypoint.MAX_ICON_DIMENSIONS + "x" + Waypoint.MAX_ICON_DIMENSIONS + " pixels"));
     private static final SimpleCommandExceptionType INVALID_IMAGE_FORMAT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Invalid image format"));
     private static final DynamicCommandExceptionType NO_SUCH_ICON_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("No such icon: " + name));
 
@@ -395,7 +396,11 @@ public class WaypointCommand {
         } catch (IOException e) {
             throw INVALID_IMAGE_FORMAT_EXCEPTION.create();
         }
-        if (image.getWidth() != Waypoint.ICON_DIMENSIONS || image.getHeight() != Waypoint.ICON_DIMENSIONS) {
+        if (image.getWidth() != image.getHeight()
+            || image.getWidth() < Waypoint.MIN_ICON_DIMENSIONS
+            || image.getWidth() > Waypoint.MAX_ICON_DIMENSIONS
+            || !Mth.isPowerOfTwo(image.getWidth())
+        ) {
             throw WRONG_IMAGE_DIMENSIONS_EXCEPTION.create();
         }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

@@ -22,7 +22,8 @@ public record Waypoint(
     @Nullable String authorName,
     @Nullable String icon
 ) {
-    public static final int ICON_DIMENSIONS = 16;
+    public static final int MIN_ICON_DIMENSIONS = 16;
+    public static final int MAX_ICON_DIMENSIONS = 128;
 
     public Waypoint(int protocolVersion, FriendlyByteBuf buf) {
         this(
