@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -37,6 +38,23 @@ public final class FriendlyByteBufUtil {
         for (T element : collection) {
             serializer.accept(buf, element);
         }
+    }
+
+    public static <K, V, M extends Map<K, V>> M readMap(FriendlyByteBuf buf, IntFunction<M> mapSupplier, Function<FriendlyByteBuf, K> keyDeserializer, Function<FriendlyByteBuf, V> valueDeserializer) {
+        int size = buf.readVarInt();
+        M result = mapSupplier.apply(size);
+        for (int i = 0; i < size; i++) {
+            result.put(keyDeserializer.apply(buf), valueDeserializer.apply(buf));
+        }
+        return result;
+    }
+
+    public static <K, V> void writeMap(FriendlyByteBuf buf, Map<K, V> map, BiConsumer<FriendlyByteBuf, K> keySerializer, BiConsumer<FriendlyByteBuf, V> valueSerializer) {
+        buf.writeVarInt(map.size());
+        map.forEach((k, v) -> {
+            keySerializer.accept(buf, k);
+            valueSerializer.accept(buf, v);
+        });
     }
 
     @Nullable

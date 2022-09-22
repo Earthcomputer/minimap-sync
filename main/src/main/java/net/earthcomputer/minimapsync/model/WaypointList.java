@@ -20,12 +20,12 @@ public final class WaypointList {
         waypoints = new ArrayList<>();
     }
 
-    public WaypointList(FriendlyByteBuf buf) {
-        waypoints = FriendlyByteBufUtil.readList(buf, Waypoint::new);
+    public WaypointList(int protocolVersion, FriendlyByteBuf buf) {
+        waypoints = FriendlyByteBufUtil.readList(buf, buf1 -> new Waypoint(protocolVersion, buf1));
     }
 
-    public void toPacket(FriendlyByteBuf buf) {
-        FriendlyByteBufUtil.writeCollection(buf, waypoints, (buf2, waypoint) -> waypoint.toPacket(buf2));
+    public void toPacket(int protocolVersion, FriendlyByteBuf buf) {
+        FriendlyByteBufUtil.writeCollection(buf, waypoints, (buf2, waypoint) -> waypoint.toPacket(protocolVersion, buf2));
     }
 
     @Nullable
@@ -96,6 +96,17 @@ public final class WaypointList {
             Waypoint waypoint = waypoints.get(i);
             if (waypoint.name().equals(name)) {
                 waypoints.set(i, waypoint.withDescription(description));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setIcon(String name, @Nullable String icon) {
+        for (int i = 0; i < waypoints.size(); i++) {
+            Waypoint waypoint = waypoints.get(i);
+            if (waypoint.name().equals(name)) {
+                waypoints.set(i, waypoint.withIcon(icon));
                 return true;
             }
         }

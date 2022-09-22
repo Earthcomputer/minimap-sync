@@ -1,6 +1,7 @@
 package net.earthcomputer.minimapsync;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -21,19 +22,30 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.commands.TeleportCommand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import org.apache.commons.lang3.ArrayUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.spi.ImageReaderSpi;
+import javax.imageio.stream.ImageInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MinimapSync implements ModInitializer {
+    public static final int CURRENT_PROTOCOL_VERSION = 1;
+    public static final ResourceLocation PROTOCOL_VERSION = new ResourceLocation("minimapsync:protocol_version");
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
     public static final ResourceLocation ADD_WAYPOINT = new ResourceLocation("minimapsync:add_waypoint");
     public static final ResourceLocation REMOVE_WAYPOINT = new ResourceLocation("minimapsync:remove_waypoint");
@@ -43,6 +55,9 @@ public class MinimapSync implements ModInitializer {
     public static final ResourceLocation SET_WAYPOINT_DESCRIPTION = new ResourceLocation("minimapsync:set_waypoint_description");
     public static final ResourceLocation SET_WAYPOINT_TELEPORT_RULE = new ResourceLocation("minimapsync:set_waypoint_teleport_rule");
     public static final ResourceLocation TELEPORT = new ResourceLocation("minimapsync:teleport");
+    public static final ResourceLocation ADD_ICON = new ResourceLocation("minimapsync:add_icon");
+    public static final ResourceLocation REMOVE_ICON = new ResourceLocation("minimapsync:remove_icon");
+    public static final ResourceLocation SET_ICON = new ResourceLocation("minimapsync:set_icon");
 
 
     @Override
@@ -51,17 +66,31 @@ public class MinimapSync implements ModInitializer {
             WaypointCommand.register(dispatcher);
         });
         S2CPlayChannelEvents.REGISTER.register((handler, sender, server, channels) -> {
-            if (channels.contains(INIT_MODEL)) {
+            if (channels.contains(PROTOCOL_VERSION)) {
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                buf.writeVarInt(CURRENT_PROTOCOL_VERSION);
+                sender.sendPacket(PROTOCOL_VERSION, buf);
+            } else if (channels.contains(INIT_MODEL)) {
                 server.execute(() -> {
                     FriendlyByteBuf buf = PacketByteBufs.create();
-                    Model.get(server).toPacket(buf);
+                    Model.get(server).toPacket(0, buf);
                     sender.sendPacket(INIT_MODEL, buf);
                 });
             }
         });
 
+        ServerPlayNetworking.registerGlobalReceiver(PROTOCOL_VERSION, (server, player, handler, buf, responseSender) -> {
+            ((IHasProtocolVersion) handler).minimapsync_setProtocolVersion(Math.min(CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
+            if (ServerPlayNetworking.canSend(handler, INIT_MODEL)) {
+                server.execute(() -> {
+                    FriendlyByteBuf buf2 = PacketByteBufs.create();
+                    Model.get(server).toPacket(getProtocolVersion(handler), buf2);
+                    responseSender.sendPacket(INIT_MODEL, buf2);
+                });
+            }
+        });
         ServerPlayNetworking.registerGlobalReceiver(ADD_WAYPOINT, (server, player, handler, buf, responseSender) -> {
-            Waypoint waypoint = new Waypoint(buf);
+            Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf);
             server.execute(() -> addWaypoint(player, server, waypoint.withAuthor(player.getUUID()).withAuthorName(player.getGameProfile().getName())));
         });
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_WAYPOINT, (server, player, handler, buf, responseSender) -> {
@@ -100,6 +129,45 @@ public class MinimapSync implements ModInitializer {
                 }
             });
         });
+        ServerPlayNetworking.registerGlobalReceiver(ADD_ICON, (server, player, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            byte[] icon = buf.readByteArray();
+            // validate icon format
+            try {
+                ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(icon));
+                Iterator<ImageReader> imageReaders = ImageIO.getImageReaders(iis);
+                if (!imageReaders.hasNext()) {
+                    return;
+                }
+                ImageReader imageReader = imageReaders.next();
+                ImageReaderSpi originatingProvider = imageReader.getOriginatingProvider();
+                if (originatingProvider == null) {
+                    return;
+                }
+                if (!ArrayUtils.contains(originatingProvider.getFormatNames(), "PNG")) {
+                    return;
+                }
+                if (imageReader.getWidth(0) != Waypoint.ICON_DIMENSIONS || imageReader.getHeight(0) != Waypoint.ICON_DIMENSIONS) {
+                    return;
+                }
+            } catch (IOException e) {
+                return;
+            }
+            server.execute(() -> addIcon(server, name, icon));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(REMOVE_ICON, (server, player, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            server.execute(() -> delIcon(server, name));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(SET_ICON, (server, player, handler, buf, responseSender) -> {
+            String waypoint = buf.readUtf(256);
+            String icon = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
+            server.execute(() -> setWaypointIcon(server, waypoint, icon));
+        });
+    }
+
+    public static int getProtocolVersion(ServerGamePacketListenerImpl handler) {
+        return ((IHasProtocolVersion) handler).minimapsync_getProtocolVersion();
     }
 
     public static int randomColor() {
@@ -118,12 +186,11 @@ public class MinimapSync implements ModInitializer {
         }
         model.save(server);
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
-        waypoint.toPacket(buf);
-        Packet<?> packet = ServerPlayNetworking.createS2CPacket(ADD_WAYPOINT, buf);
         for (ServerPlayer player : PlayerLookup.all(server)) {
             if (player != source && ServerPlayNetworking.canSend(player, ADD_WAYPOINT)) {
-                player.connection.send(packet);
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                waypoint.toPacket(getProtocolVersion(player.connection), buf);
+                ServerPlayNetworking.send(player, ADD_WAYPOINT, buf);
             }
         }
 
@@ -263,6 +330,66 @@ public class MinimapSync implements ModInitializer {
             entity.getXRot(),
             null
         );
+
+        return true;
+    }
+
+    public static boolean addIcon(MinecraftServer server, String name, byte[] icon) {
+        Model model = Model.get(server);
+        if (model.icons().containsKey(name)) {
+            return false;
+        }
+        model.icons().put(name, icon);
+        model.save(server);
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(name, 256);
+        buf.writeByteArray(icon);
+        Packet<?> packet = ServerPlayNetworking.createS2CPacket(ADD_ICON, buf);
+        for (ServerPlayer player : PlayerLookup.all(server)) {
+            if (ServerPlayNetworking.canSend(player, ADD_ICON)) {
+                player.connection.send(packet);
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean delIcon(MinecraftServer server, String name) {
+        Model model = Model.get(server);
+        if (model.icons().remove(name) == null) {
+            return false;
+        }
+        model.save(server);
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(name, 256);
+        Packet<?> packet = ServerPlayNetworking.createS2CPacket(REMOVE_ICON, buf);
+        for (ServerPlayer player : PlayerLookup.all(server)) {
+            if (ServerPlayNetworking.canSend(player, REMOVE_ICON)) {
+                player.connection.send(packet);
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean setWaypointIcon(MinecraftServer server, String waypoint, @Nullable String icon) {
+        Model model = Model.get(server);
+        if (!model.waypoints().setIcon(waypoint, icon)) {
+            return false;
+        }
+        model.save(server);
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(waypoint, 256);
+        FriendlyByteBufUtil.writeNullable(buf, icon, FriendlyByteBuf::writeUtf);
+        Packet<?> packet = ServerPlayNetworking.createS2CPacket(SET_ICON, buf);
+        for (ServerPlayer player : PlayerLookup.all(server)) {
+            if (ServerPlayNetworking.canSend(player, SET_ICON)) {
+                player.connection.send(packet);
+            }
+        }
 
         return true;
     }

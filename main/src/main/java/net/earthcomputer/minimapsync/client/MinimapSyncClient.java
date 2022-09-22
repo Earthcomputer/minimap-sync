@@ -3,6 +3,7 @@ package net.earthcomputer.minimapsync.client;
 import com.google.common.collect.ImmutableList;
 import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.MinimapSync;
+import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -65,12 +66,18 @@ public class MinimapSyncClient implements ClientModInitializer {
             whenReady.clear();
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.PROTOCOL_VERSION, (client, handler, buf, responseSender) -> {
+            ((IHasProtocolVersion) handler).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
+            FriendlyByteBuf buf1 = PacketByteBufs.create();
+            buf1.writeVarInt(MinimapSync.CURRENT_PROTOCOL_VERSION);
+            responseSender.sendPacket(MinimapSync.PROTOCOL_VERSION, buf1);
+        });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, buf, responseSender) -> {
-            Model model = new Model(buf);
+            Model model = new Model(getProtocolVersion(handler), buf);
             client.execute(() -> whenReady(() -> initModel(handler, model)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_WAYPOINT, (client, handler, buf, responseSender) -> {
-            Waypoint waypoint = new Waypoint(buf);
+            Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf);
             client.execute(() -> whenReady(() -> addWaypoint(null, handler, waypoint)));
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_WAYPOINT, (client, handler, buf, responseSender) -> {
@@ -101,6 +108,20 @@ public class MinimapSyncClient implements ClientModInitializer {
             WaypointTeleportRule rule = buf.readEnum(WaypointTeleportRule.class);
             client.execute(() -> whenReady(() -> setWaypointTeleportRule(null, handler, rule)));
         });
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_ICON, (client, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            byte[] icon = buf.readByteArray();
+            client.execute(() -> whenReady(() -> addIcon(null, handler, name, icon)));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_ICON, (client, handler, buf, responseSender) -> {
+            String name = buf.readUtf(256);
+            client.execute(() -> whenReady(() -> removeIcon(null, handler, name)));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_ICON, (client, handler, buf, responseSender) -> {
+            String waypoint = buf.readUtf(256);
+            String icon = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
+            client.execute(() -> whenReady(() -> setWaypointIcon(null, handler, waypoint, icon)));
+        });
     }
 
     private static void whenReady(Runnable runnable) {
@@ -119,6 +140,10 @@ public class MinimapSyncClient implements ClientModInitializer {
             runnable.run();
         }
         whenReady.clear();
+    }
+
+    public static int getProtocolVersion(ClientPacketListener handler) {
+        return ((IHasProtocolVersion) handler).minimapsync_getProtocolVersion();
     }
 
     public static boolean isCompatibleServer() {
@@ -250,16 +275,62 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
+    private static void addIcon(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, byte[] icon) {
+        Model.get(handler).icons().put(name, icon);
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
+            if (compat != source) {
+                IMinimapCompat prevIgnore = currentIgnore;
+                try {
+                    currentIgnore = compat;
+                    compat.addIcon(handler, name, icon);
+                } finally {
+                    currentIgnore = prevIgnore;
+                }
+            }
+        }
+    }
+
+    private static void removeIcon(@Nullable IMinimapCompat source, ClientPacketListener handler, String name) {
+        Model.get(handler).icons().remove(name);
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
+            if (compat != source) {
+                IMinimapCompat prevIgnore = currentIgnore;
+                try {
+                    currentIgnore = compat;
+                    compat.removeIcon(handler, name);
+                } finally {
+                    currentIgnore = prevIgnore;
+                }
+            }
+        }
+    }
+
+    private static void setWaypointIcon(@Nullable IMinimapCompat source, ClientPacketListener handler, String waypoint, @Nullable String icon) {
+        Model.get(handler).waypoints().setIcon(waypoint, icon);
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
+            if (compat != source) {
+                IMinimapCompat prevIgnore = currentIgnore;
+                try {
+                    currentIgnore = compat;
+                    compat.setWaypointIcon(handler, waypoint, icon);
+                } finally {
+                    currentIgnore = prevIgnore;
+                }
+            }
+        }
+    }
+
     public static void onAddWaypoint(IMinimapCompat source, Waypoint waypoint) {
         if (source == currentIgnore) {
             return;
         }
 
-        addWaypoint(source, Minecraft.getInstance().getConnection(), waypoint);
+        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        addWaypoint(source, connection, waypoint);
 
         if (ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT)) {
             FriendlyByteBuf buf = PacketByteBufs.create();
-            waypoint.toPacket(buf);
+            waypoint.toPacket(getProtocolVersion(connection), buf);
             ClientPlayNetworking.send(MinimapSync.ADD_WAYPOINT, buf);
         }
     }

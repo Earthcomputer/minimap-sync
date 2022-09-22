@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import net.earthcomputer.minimapsync.model.Model;
@@ -23,7 +24,20 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Nullable;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -38,10 +52,24 @@ import static net.minecraft.commands.arguments.GameProfileArgument.*;
 import static net.minecraft.commands.arguments.coordinates.BlockPosArgument.*;
 
 public class WaypointCommand {
+    private static final long MAX_IMAGE_SIZE = 1024 * 1024; // 1 megabyte
+    private static final String MAX_IMAGE_SIZE_STRING = "1MB";
+
     private static final DynamicCommandExceptionType DUPLICATE_NAME_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("Duplicate waypoint name: " + name));
     private static final DynamicCommandExceptionType NO_SUCH_WAYPOINT_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("No such waypoint: " + name));
     private static final SimpleCommandExceptionType NO_WAYPOINTS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("No waypoints found"));
     private static final SimpleCommandExceptionType CANNOT_TELEPORT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("No permission to teleport"));
+    private static final SimpleCommandExceptionType NO_ICONS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("No icons found"));
+    private static final DynamicCommandExceptionType DUPLICATE_ICON_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("Duplicate icon name: " + name));
+    private static final DynamicCommandExceptionType INVALID_URI_EXCEPTION = new DynamicCommandExceptionType(uri -> Component.nullToEmpty("Invalid URI: " + uri));
+    private static final DynamicCommandExceptionType INVALID_URI_SCHEME_EXCEPTION = new DynamicCommandExceptionType(scheme -> Component.nullToEmpty("Invalid URI scheme: " + scheme));
+    private static final SimpleCommandExceptionType COULDNT_CONNECT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Couldn't connect to URL"));
+    private static final SimpleCommandExceptionType UNKNOWN_HOST_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Couldn't connect to URL: unknown host"));
+    private static final Dynamic2CommandExceptionType COULDNT_CONNECT_STATUS_CODE_EXCEPTION = new Dynamic2CommandExceptionType((code, desc) -> Component.nullToEmpty("Couldn't connect to URL: HTTP " + code + " " + desc));
+    private static final SimpleCommandExceptionType IMAGE_TOO_LARGE_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Image too large, must be at most " + MAX_IMAGE_SIZE_STRING));
+    private static final SimpleCommandExceptionType WRONG_IMAGE_DIMENSIONS_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Wrong image dimensions: expected " + Waypoint.ICON_DIMENSIONS + "x" + Waypoint.ICON_DIMENSIONS + " pixels"));
+    private static final SimpleCommandExceptionType INVALID_IMAGE_FORMAT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Invalid image format"));
+    private static final DynamicCommandExceptionType NO_SUCH_ICON_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("No such icon: " + name));
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(literal("waypoint")
@@ -86,7 +114,24 @@ public class WaypointCommand {
                     .then(literal("op_players")
                         .executes(ctx -> setTeleportConfig(ctx.getSource(), WaypointTeleportRule.OP_PLAYERS)))
                     .then(literal("always")
-                        .executes(ctx -> setTeleportConfig(ctx.getSource(), WaypointTeleportRule.ALWAYS))))));
+                        .executes(ctx -> setTeleportConfig(ctx.getSource(), WaypointTeleportRule.ALWAYS)))))
+            .then(literal("icon")
+                .then(literal("list")
+                    .executes(ctx -> listIcons(ctx.getSource())))
+                .then(literal("add")
+                    .then(argument("name", string())
+                        .then(argument("url", greedyString())
+                            .executes(ctx -> addIcon(ctx.getSource(), getString(ctx, "name"), getString(ctx, "url"))))))
+                .then(literal("del")
+                    .then(argument("name", string())
+                        .executes(ctx -> delIcon(ctx.getSource(), getString(ctx, "name")))))
+                .then(literal("set")
+                    .then(argument("waypoint", string())
+                        .then(argument("icon", string())
+                            .executes(ctx -> setWaypointIcon(ctx.getSource(), getString(ctx, "waypoint"), getString(ctx, "icon"))))))
+                .then(literal("unset")
+                    .then(argument("waypoint", string())
+                        .executes(ctx -> unsetWaypointIcon(ctx.getSource(), getString(ctx, "waypoint")))))));
     }
 
     private static int addWaypoint(CommandSourceStack source, String name, BlockPos pos, @Nullable String description) throws CommandSyntaxException {
@@ -102,7 +147,8 @@ public class WaypointCommand {
             new LinkedHashSet<>(List.of(source.getLevel().dimension())),
             pos,
             uuid,
-            entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null
+            entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null,
+            null
         );
 
         if (!MinimapSync.addWaypoint(null, source.getServer(), waypoint)) {
@@ -234,6 +280,156 @@ public class WaypointCommand {
     private static int setTeleportConfig(CommandSourceStack source, WaypointTeleportRule rule) {
         MinimapSync.setTeleportRule(source.getServer(), rule);
         source.sendSuccess(Component.nullToEmpty("Teleport rule set to: " + rule.name()), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int listIcons(CommandSourceStack source) throws CommandSyntaxException {
+        Model model = Model.get(source.getServer());
+        if (model.icons().isEmpty()) {
+            throw NO_ICONS_EXCEPTION.create();
+        }
+
+        source.sendSuccess(MinimapSync.createComponent("""
+            {"text": "=== List of %d icons ===", "color": "aqua", "bold": "true"}
+        """, model.icons().size()), false);
+        for (String icon : model.icons().keySet()) {
+            source.sendSuccess(MinimapSync.createComponent("""
+                [
+                    "- ",
+                    {"text": "%s", "color": "gold"}
+                ]
+            """, icon), false);
+        }
+
+        return model.icons().size();
+    }
+
+    private static int addIcon(CommandSourceStack source, String name, String url) throws CommandSyntaxException {
+        Model model = Model.get(source.getServer());
+        if (model.icons().containsKey(name)) {
+            throw DUPLICATE_ICON_EXCEPTION.create(name);
+        }
+
+        URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            throw INVALID_URI_EXCEPTION.create(url);
+        }
+
+        String scheme = uri.getScheme();
+        byte[] data;
+
+        if ("https".equals(scheme)) {
+            URL urlObj;
+            try {
+                urlObj = uri.toURL();
+            } catch (MalformedURLException e) {
+                throw INVALID_URI_EXCEPTION.create(url);
+            }
+
+            HttpURLConnection connection;
+            int responseCode;
+            String responseMessage;
+            try {
+                connection = (HttpURLConnection) urlObj.openConnection();
+                connection.connect();
+                responseCode = connection.getResponseCode();
+                responseMessage = connection.getResponseMessage();
+            } catch (UnknownHostException e) {
+                throw UNKNOWN_HOST_EXCEPTION.create();
+            } catch (IOException e) {
+                throw COULDNT_CONNECT_EXCEPTION.create();
+            }
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw COULDNT_CONNECT_STATUS_CODE_EXCEPTION.create(responseCode, responseMessage);
+            }
+
+            long contentLength = connection.getContentLengthLong();
+            if (contentLength > MAX_IMAGE_SIZE) {
+                throw IMAGE_TOO_LARGE_EXCEPTION.create();
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (InputStream in = connection.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int totalRead = 0;
+                int amtRead;
+                while ((amtRead = in.read(buffer)) != -1) {
+                    totalRead += amtRead;
+                    if (totalRead > MAX_IMAGE_SIZE) {
+                        throw IMAGE_TOO_LARGE_EXCEPTION.create();
+                    }
+                    baos.write(buffer, 0, amtRead);
+                }
+            } catch (IOException e) {
+                throw COULDNT_CONNECT_EXCEPTION.create();
+            }
+            data = baos.toByteArray();
+        } else if ("data".equals(scheme)) {
+            int commaIndex = url.indexOf(',');
+            if (commaIndex == -1) {
+                throw INVALID_URI_EXCEPTION.create(url);
+            }
+            try {
+                data = Base64.getDecoder().decode(url.substring(commaIndex + 1));
+            } catch (IllegalArgumentException e) {
+                throw INVALID_URI_EXCEPTION.create(url);
+            }
+        } else {
+            throw INVALID_URI_SCHEME_EXCEPTION.create(scheme);
+        }
+
+        // Re-encode the image in PNG format, and check its dimensions while we're at it
+        BufferedImage image;
+        try {
+            image = ImageIO.read(new ByteArrayInputStream(data));
+        } catch (IOException e) {
+            throw INVALID_IMAGE_FORMAT_EXCEPTION.create();
+        }
+        if (image.getWidth() != Waypoint.ICON_DIMENSIONS || image.getHeight() != Waypoint.ICON_DIMENSIONS) {
+            throw WRONG_IMAGE_DIMENSIONS_EXCEPTION.create();
+        }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(image, "PNG", baos);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        MinimapSync.addIcon(source.getServer(), name, baos.toByteArray());
+        source.sendSuccess(Component.nullToEmpty("Added waypoint icon " + name), true);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int delIcon(CommandSourceStack source, String name) throws CommandSyntaxException {
+        if (!MinimapSync.delIcon(source.getServer(), name)) {
+            throw NO_SUCH_ICON_EXCEPTION.create(name);
+        }
+
+        source.sendSuccess(Component.nullToEmpty("Deleted waypoint icon " + name), true);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int setWaypointIcon(CommandSourceStack source, String waypoint, String icon) throws CommandSyntaxException {
+        Model model = Model.get(source.getServer());
+        if (!model.icons().containsKey(icon)) {
+            throw NO_SUCH_ICON_EXCEPTION.create(icon);
+        }
+        if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, icon)) {
+            throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
+        }
+        source.sendSuccess(Component.nullToEmpty("Set icon of waypoint " + waypoint + " to " + icon), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int unsetWaypointIcon(CommandSourceStack source, String waypoint) throws CommandSyntaxException {
+        if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, null)) {
+            throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
+        }
+        source.sendSuccess(Component.nullToEmpty("Unset icon of waypoint " + waypoint), true);
         return Command.SINGLE_SUCCESS;
     }
 }

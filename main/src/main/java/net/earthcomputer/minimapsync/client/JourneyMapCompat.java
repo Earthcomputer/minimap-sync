@@ -124,7 +124,8 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             }).filter(Objects::nonNull).collect(Collectors.toSet()),
             pos,
             Minecraft.getInstance().getUser().getGameProfile().getId(),
-            Minecraft.getInstance().getUser().getGameProfile().getName()
+            Minecraft.getInstance().getUser().getGameProfile().getName(),
+            null
         );
     }
 
@@ -197,5 +198,20 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
     @Override
     public void setWaypointTeleportRule(ClientPacketListener handler, WaypointTeleportRule rule) {
+    }
+
+    @Override
+    public void addIcon(ClientPacketListener handler, String name, byte[] icon) {
+
+    }
+
+    @Override
+    public void removeIcon(ClientPacketListener handler, String name) {
+
+    }
+
+    @Override
+    public void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon) {
+
     }
 }

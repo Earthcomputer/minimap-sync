@@ -7,6 +7,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 
@@ -19,4 +20,7 @@ public interface IMinimapCompat {
     void setWaypointColor(ClientPacketListener handler, String name, int color);
     void setWaypointDescription(ClientPacketListener handler, String name, String description);
     void setWaypointTeleportRule(ClientPacketListener handler, WaypointTeleportRule rule);
+    void addIcon(ClientPacketListener handler, String name, byte[] icon);
+    void removeIcon(ClientPacketListener handler, String name);
+    void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon);
 }

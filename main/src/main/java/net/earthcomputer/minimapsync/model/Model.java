@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import marcono1234.gson.recordadapter.RecordTypeAdapterFactory;
+import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.ducks.IHasModel;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -24,13 +25,17 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 public record Model(
         WaypointList waypoints,
-        WaypointTeleportRule teleportRule
+        WaypointTeleportRule teleportRule,
+        Map<String, byte[]> icons
 ) {
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = new GsonBuilder()
+        .registerTypeAdapter(byte[].class, Base64Serializer.INSTANCE)
         .registerTypeAdapter(BlockPos.class, BlockPosSerializer.INSTANCE)
         .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registry.DIMENSION_REGISTRY))
         .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
@@ -40,11 +45,15 @@ public record Model(
         .create();
 
     public Model() {
-        this(new WaypointList(), WaypointTeleportRule.NEVER);
+        this(new WaypointList(), WaypointTeleportRule.NEVER, new HashMap<>());
     }
 
-    public Model(FriendlyByteBuf buf) {
-        this(new WaypointList(buf), buf.readEnum(WaypointTeleportRule.class));
+    public Model(int protocolVersion, FriendlyByteBuf buf) {
+        this(
+            new WaypointList(protocolVersion, buf),
+            buf.readEnum(WaypointTeleportRule.class),
+            protocolVersion >= 1 ? FriendlyByteBufUtil.readMap(buf, HashMap::new, FriendlyByteBuf::readUtf, FriendlyByteBuf::readByteArray) : new HashMap<>()
+        );
     }
 
     private static Path getSavePath(MinecraftServer server) {
@@ -56,6 +65,9 @@ public record Model(
         try (var reader = Files.newBufferedReader(file)) {
             Model result = GSON.fromJson(reader, Model.class);
             if (result != null) {
+                if (result.icons == null) {
+                    result = result.withIcons(new HashMap<>());
+                }
                 return result;
             }
         } catch (IOException | JsonParseException e) {
@@ -66,9 +78,12 @@ public record Model(
         return new Model();
     }
 
-    public void toPacket(FriendlyByteBuf buf) {
-        waypoints.toPacket(buf);
+    public void toPacket(int protocolVersion, FriendlyByteBuf buf) {
+        waypoints.toPacket(protocolVersion, buf);
         buf.writeEnum(teleportRule);
+        if (protocolVersion >= 1) {
+            FriendlyByteBufUtil.writeMap(buf, icons, FriendlyByteBuf::writeUtf, FriendlyByteBuf::writeByteArray);
+        }
     }
 
     public void save(MinecraftServer server) {
@@ -84,7 +99,11 @@ public record Model(
     }
 
     public Model withTeleportRule(WaypointTeleportRule teleportRule) {
-        return new Model(waypoints, teleportRule);
+        return new Model(waypoints, teleportRule, icons);
+    }
+
+    public Model withIcons(Map<String, byte[]> icons) {
+        return new Model(waypoints, teleportRule, icons);
     }
 
     public static Model get(MinecraftServer server) {

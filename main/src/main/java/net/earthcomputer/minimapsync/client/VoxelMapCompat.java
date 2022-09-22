@@ -19,6 +19,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -75,7 +76,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 .collect(Collectors.toCollection(LinkedHashSet::new)),
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
             Minecraft.getInstance().getUser().getGameProfile().getId(),
-            Minecraft.getInstance().getUser().getGameProfile().getName()
+            Minecraft.getInstance().getUser().getGameProfile().getName(),
+            null
         );
     }
 
@@ -310,5 +312,20 @@ public enum VoxelMapCompat implements IMinimapCompat {
         ClientPlayNetworking.send(MinimapSync.TELEPORT, buf);
 
         return true;
+    }
+
+    @Override
+    public void addIcon(ClientPacketListener handler, String name, byte[] icon) {
+
+    }
+
+    @Override
+    public void removeIcon(ClientPacketListener handler, String name) {
+
+    }
+
+    @Override
+    public void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon) {
+
     }
 }
