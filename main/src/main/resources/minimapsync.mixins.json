@@ -10,6 +10,7 @@
   ],
   "client": [
     "ClientPacketListenerMixin",
+    "voxelmap.GuiAddWaypointMixin",
     "voxelmap.GuiPersistentMapMixin",
     "voxelmap.GuiWaypointsMixin",
     "voxelmap.WaypointManagerMixin"

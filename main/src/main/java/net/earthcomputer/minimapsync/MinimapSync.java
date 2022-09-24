@@ -147,6 +147,7 @@ public class MinimapSync implements ModInitializer {
                 if (!ArrayUtils.contains(originatingProvider.getFormatNames(), "PNG")) {
                     return;
                 }
+                imageReader.setInput(iis);
                 int width = imageReader.getWidth(0);
                 int height = imageReader.getHeight(0);
                 if (width != height

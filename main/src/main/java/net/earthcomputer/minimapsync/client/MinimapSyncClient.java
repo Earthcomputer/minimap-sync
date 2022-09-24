@@ -393,4 +393,48 @@ public class MinimapSyncClient implements ClientModInitializer {
             ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_COLOR, buf);
         }
     }
+
+    public static void onAddIcon(@Nullable IMinimapCompat source, String name, byte[] icon) {
+        if (source != null && source == currentIgnore) {
+            return;
+        }
+
+        addIcon(source, Minecraft.getInstance().getConnection(), name, icon);
+
+        if (ClientPlayNetworking.canSend(MinimapSync.ADD_ICON)) {
+            FriendlyByteBuf buf = PacketByteBufs.create();
+            buf.writeUtf(name, 256);
+            buf.writeByteArray(icon);
+            ClientPlayNetworking.send(MinimapSync.ADD_ICON, buf);
+        }
+    }
+
+    public static void onRemoveIcon(@Nullable IMinimapCompat source, String name) {
+        if (source != null && source == currentIgnore) {
+            return;
+        }
+
+        removeIcon(source, Minecraft.getInstance().getConnection(), name);
+
+        if (ClientPlayNetworking.canSend(MinimapSync.REMOVE_ICON)) {
+            FriendlyByteBuf buf = PacketByteBufs.create();
+            buf.writeUtf(name, 256);
+            ClientPlayNetworking.send(MinimapSync.REMOVE_ICON, buf);
+        }
+    }
+
+    public static void onSetWaypointIcon(IMinimapCompat source, Waypoint waypoint) {
+        if (source == currentIgnore) {
+            return;
+        }
+
+        setWaypointIcon(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.icon());
+
+        if (ClientPlayNetworking.canSend(MinimapSync.SET_ICON)) {
+            FriendlyByteBuf buf = PacketByteBufs.create();
+            buf.writeUtf(waypoint.name(), 256);
+            FriendlyByteBufUtil.writeNullable(buf, waypoint.icon(), FriendlyByteBuf::writeUtf);
+            ClientPlayNetworking.send(MinimapSync.SET_ICON, buf);
+        }
+    }
 }

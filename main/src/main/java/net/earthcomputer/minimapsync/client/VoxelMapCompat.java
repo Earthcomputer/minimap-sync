@@ -3,6 +3,7 @@ package net.earthcomputer.minimapsync.client;
 import com.mamiyaotaru.voxelmap.interfaces.AbstractVoxelMap;
 import com.mamiyaotaru.voxelmap.interfaces.IDimensionManager;
 import com.mamiyaotaru.voxelmap.interfaces.IWaypointManager;
+import com.mamiyaotaru.voxelmap.textures.TextureAtlas;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
@@ -19,12 +20,21 @@ import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -33,6 +43,9 @@ import java.util.stream.Collectors;
 public enum VoxelMapCompat implements IMinimapCompat {
     INSTANCE;
 
+    private static final Logger LOGGER = LogManager.getLogger();
+    private static final String ICON_PREFIX = "minimapsync_";
+
     public VoxelMapCompat init() {
         ClientTickEvents.START_WORLD_TICK.register(this::onWorldTick);
         return this;
@@ -40,6 +53,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     private int tickCounter = 0;
     private final List<Waypoint> serverKnownWaypoints = new ArrayList<>();
+    private final Map<String, BufferedImage> icons = new HashMap<>();
 
     private static boolean isDeathpoint(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
         return waypoint.imageSuffix.equals("skull");
@@ -58,7 +72,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             ((waypoint.color() >> 16) & 0xff) / 255f,
             ((waypoint.color() >> 8) & 0xff) / 255f,
             (waypoint.color() & 0xff) / 255f,
-            "",
+            waypoint.icon() == null ? "" : decorateIconNameSuffix(waypoint.icon()),
             waypointManager.getCurrentSubworldDescriptor(false),
             waypoint.dimensions().stream()
                 .map(dim -> dimensionManager.getDimensionContainerByIdentifier(dim.location().toString()))
@@ -77,7 +91,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
             Minecraft.getInstance().getUser().getGameProfile().getId(),
             Minecraft.getInstance().getUser().getGameProfile().getName(),
-            null
+            undecorateIconNameSuffix(waypoint.imageSuffix)
         );
     }
 
@@ -131,6 +145,13 @@ public enum VoxelMapCompat implements IMinimapCompat {
                     MinimapSyncClient.onSetWaypointColor(this, serverWaypoint);
                     changed = true;
                 }
+
+                String icon = undecorateIconNameSuffix(voxelWaypoint.imageSuffix);
+                if (!Objects.equals(icon, serverWaypoint.icon())) {
+                    serverWaypoint = serverWaypoint.withIcon(icon);
+                    MinimapSyncClient.onSetWaypointIcon(this, serverWaypoint);
+                    changed = true;
+                }
             }
         }
 
@@ -164,6 +185,23 @@ public enum VoxelMapCompat implements IMinimapCompat {
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
             waypointManager.addWaypoint(toVoxel(waypoint));
         }
+
+        icons.clear();
+        model.icons().forEach((name, icon) -> {
+            BufferedImage image;
+            try {
+                image = ImageIO.read(new ByteArrayInputStream(icon));
+            } catch (IOException e) {
+                LOGGER.warn("Failed to read icon", e);
+                return;
+            }
+            waypointManager.getTextureAtlas().registerIconForBufferedImage(decorateIconName(name), image);
+            icons.put(name, image);
+        });
+        if (!model.icons().isEmpty()) {
+            waypointManager.getTextureAtlas().stitchNew();
+        }
+
         waypointManager.saveWaypoints();
     }
 
@@ -185,6 +223,9 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 voxelWaypoint.red = newVoxelWaypoint.red;
                 voxelWaypoint.green = newVoxelWaypoint.green;
                 voxelWaypoint.blue = newVoxelWaypoint.blue;
+                if (serverWaypoint.icon() != null) {
+                    voxelWaypoint.imageSuffix = decorateIconNameSuffix(serverWaypoint.icon());
+                }
                 wayPts.add(voxelWaypoint);
             }
         }
@@ -316,16 +357,64 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     @Override
     public void addIcon(ClientPacketListener handler, String name, byte[] icon) {
+        BufferedImage image;
+        try {
+            image = ImageIO.read(new ByteArrayInputStream(icon));
+        } catch (IOException e) {
+            LOGGER.warn("Failed to read icon", e);
+            return;
+        }
 
+        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        TextureAtlas atlas = waypointManager.getTextureAtlas();
+        atlas.registerIconForBufferedImage(decorateIconName(name), image);
+        atlas.stitchNew();
+        icons.put(name, image);
     }
 
     @Override
     public void removeIcon(ClientPacketListener handler, String name) {
+        // too much work to rebuild the atlas
 
+        icons.remove(name);
+    }
+
+    public void registerIconsToAtlas(TextureAtlas atlas) {
+        icons.forEach((name, image) -> atlas.registerIconForBufferedImage(decorateIconName(name), image));
     }
 
     @Override
     public void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon) {
+        for (int i = 0; i < serverKnownWaypoints.size(); i++) {
+            Waypoint wpt = serverKnownWaypoints.get(i);
+            if (wpt.name().equals(waypoint)) {
+                serverKnownWaypoints.set(i, wpt.withIcon(icon));
+            }
+        }
 
+        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        boolean changed = false;
+        for (var wpt : waypointManager.getWaypoints()) {
+            if (waypoint.equals(wpt.name)) {
+                wpt.imageSuffix = icon == null ? "" : decorateIconNameSuffix(icon);
+                changed = true;
+            }
+        }
+        if (changed) {
+            waypointManager.saveWaypoints();
+        }
+    }
+
+    public static String decorateIconName(String name) {
+        return "voxelmap:images/waypoints/waypoint" + decorateIconNameSuffix(name) + ".png";
+    }
+
+    public static String decorateIconNameSuffix(String name) {
+        return ICON_PREFIX + name;
+    }
+
+    @Nullable
+    public static String undecorateIconNameSuffix(String name) {
+        return name.startsWith(ICON_PREFIX) ? name.substring(ICON_PREFIX.length()) : null;
     }
 }

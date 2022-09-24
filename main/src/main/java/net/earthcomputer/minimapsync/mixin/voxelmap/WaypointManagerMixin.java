@@ -1,6 +1,7 @@
 package net.earthcomputer.minimapsync.mixin.voxelmap;
 
 import com.mamiyaotaru.voxelmap.WaypointManager;
+import com.mamiyaotaru.voxelmap.textures.IIconCreator;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.client.VoxelMapCompat;
@@ -9,6 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -30,5 +32,16 @@ public class WaypointManagerMixin {
         if (level != null) {
             MinimapSyncClient.onReady();
         }
+    }
+
+    @ModifyVariable(method = "onResourceManagerReload", at = @At(value = "STORE", ordinal = 0), ordinal = 0)
+    private IIconCreator modifyIconCreator(IIconCreator creator) {
+        if (MinimapSyncClient.isCompatibleServer()) {
+            return atlas -> {
+                creator.addIcons(atlas);
+                VoxelMapCompat.INSTANCE.registerIconsToAtlas(atlas);
+            };
+        }
+        return creator;
     }
 }
