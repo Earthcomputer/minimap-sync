@@ -147,37 +147,11 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
         }
 
         private Entry(String name, String filePath, NativeImage image) {
-            this(name, makeRenderer(filePath, image));
+            this(name, IconRenderer.makeRendererFromImage(filePath, image));
         }
 
         public String getName() {
             return name;
-        }
-
-        private static IconRenderer makeRenderer(String filePath, NativeImage image) {
-            DynamicTexture texture = new DynamicTexture(image);
-            //noinspection UnstableApiUsage
-            ResourceLocation textureLocation = new ResourceLocation(
-                "minimapsync",
-                "dynamic_icon_" + Util.sanitizeName(filePath, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(filePath)
-            );
-            Minecraft.getInstance().getTextureManager().register(textureLocation, texture);
-            return new IconRenderer() {
-                @Override
-                public void render(PoseStack poseStack, int x, int y, int width, int height, float red, float green, float blue) {
-                    RenderSystem.setShader(GameRenderer::getPositionTexShader);
-                    RenderSystem.setShaderColor(red, green, blue, 1);
-                    RenderSystem.setShaderTexture(0, textureLocation);
-                    RenderSystem.enableBlend();
-                    GuiComponent.blit(poseStack, x, y, 0, 0, width, height, width, height);
-                    RenderSystem.disableBlend();
-                }
-
-                @Override
-                public void close() {
-                    texture.close();
-                }
-            };
         }
 
         @Override
@@ -226,5 +200,39 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
 
         @Override
         default void close() {}
+
+        static IconRenderer makeRendererFromImage(String filePath, NativeImage image) {
+            DynamicTexture texture = new DynamicTexture(image);
+            //noinspection UnstableApiUsage
+            ResourceLocation textureLocation = new ResourceLocation(
+                "minimapsync",
+                "dynamic_icon_" + Util.sanitizeName(filePath, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(filePath)
+            );
+            Minecraft.getInstance().getTextureManager().register(textureLocation, texture);
+            return new TextureIconRenderer(textureLocation) {
+                @Override
+                public void close() {
+                    texture.close();
+                }
+            };
+        }
+    }
+
+    public static class TextureIconRenderer implements IconRenderer {
+        private final ResourceLocation textureLocation;
+
+        public TextureIconRenderer(ResourceLocation textureLocation) {
+            this.textureLocation = textureLocation;
+        }
+
+        @Override
+        public void render(PoseStack poseStack, int x, int y, int width, int height, float red, float green, float blue) {
+            RenderSystem.setShader(GameRenderer::getPositionTexShader);
+            RenderSystem.setShaderColor(red, green, blue, 1);
+            RenderSystem.setShaderTexture(0, textureLocation);
+            RenderSystem.enableBlend();
+            GuiComponent.blit(poseStack, x, y, 0, 0, width, height, width, height);
+            RenderSystem.disableBlend();
+        }
     }
 }

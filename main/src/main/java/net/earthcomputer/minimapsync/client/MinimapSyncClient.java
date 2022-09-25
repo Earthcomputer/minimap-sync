@@ -423,8 +423,8 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
-    public static void onSetWaypointIcon(IMinimapCompat source, Waypoint waypoint) {
-        if (source == currentIgnore) {
+    public static void onSetWaypointIcon(@Nullable IMinimapCompat source, Waypoint waypoint) {
+        if (source != null && source == currentIgnore) {
             return;
         }
 

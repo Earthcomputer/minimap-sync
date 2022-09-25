@@ -1,9 +1,11 @@
 package net.earthcomputer.minimapsync.client;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import journeymap.client.api.IClientAPI;
 import journeymap.client.api.IClientPlugin;
 import journeymap.client.api.event.ClientEvent;
 import journeymap.client.api.event.WaypointEvent;
+import journeymap.client.api.model.MapImage;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
@@ -15,8 +17,13 @@ import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.system.MemoryStack;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -26,11 +33,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
+    private static final Logger LOGGER = LogManager.getLogger();
     private static JourneyMapCompat INSTANCE;
     private IClientAPI api;
 
     private static final ResourceLocation NETHER = new ResourceLocation("the_nether");
+    public static final ResourceLocation ICON_NORMAL = new ResourceLocation("journeymap", "ui/img/waypoint-icon.png");
     private static final ResourceLocation ICON_DEATH = new ResourceLocation("journeymap", "ui/img/waypoint-death-icon.png");
+    private static final int ICON_SIZE = 16;
 
     public JourneyMapCompat() {
         INSTANCE = this;
@@ -51,11 +61,18 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         return "minimapsync";
     }
 
+    private boolean initializing = false;
+    private boolean refreshing = false;
     private final Map<String, journeymap.client.api.display.Waypoint> prevWaypoints = new HashMap<>();
+    private static final Map<String, NativeImage> iconImages = new HashMap<>();
 
     @Override
     public void onEvent(ClientEvent event) {
         if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
+
+        if (refreshing) {
             return;
         }
 
@@ -98,14 +115,26 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         return icon != null && ICON_DEATH.equals(icon.getImageLocation());
     }
 
+    private void refresh(journeymap.client.api.display.Waypoint waypoint) {
+        refreshing = true;
+        try {
+            api.remove(waypoint);
+            api.show(waypoint);
+        } finally {
+            refreshing = false;
+        }
+    }
+
     @Nullable
     private journeymap.client.api.display.Waypoint toJourneyMap(Waypoint waypoint) {
         if (!waypoint.dimensions().isEmpty()) {
             ResourceKey<Level> dim = waypoint.dimensions().iterator().next();
             BlockPos pos = dim == Level.NETHER ? new BlockPos(waypoint.pos().getX() >> 3, waypoint.pos().getY(), waypoint.pos().getZ() >> 3) : waypoint.pos();
+            NativeImage iconImage = waypoint.icon() == null ? null : iconImages.get(waypoint.icon());
             return new journeymap.client.api.display.Waypoint(getModId(), waypoint.name(), dim, pos)
                 .setDisplayDimensions(waypoint.dimensions().stream().map(d -> d.location().toString()).toArray(String[]::new))
-                .setColor(waypoint.color());
+                .setColor(waypoint.color())
+                .setIcon(iconImage == null ? null : new MapImage(iconImage, 0, 0, ICON_SIZE, ICON_SIZE, waypoint.color(), 1));
         }
         return null;
     }
@@ -131,18 +160,28 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
-        for (var waypoint : api.getAllWaypoints()) {
-            if (!isDeathPoint(waypoint)) {
-                api.remove(waypoint);
+        initializing = true;
+        try {
+            for (var waypoint : api.getAllWaypoints()) {
+                if (!isDeathPoint(waypoint)) {
+                    api.remove(waypoint);
+                }
             }
-        }
 
-        model.waypoints().getWaypoints(null).forEach(waypoint -> {
-            var wpt = toJourneyMap(waypoint);
-            if (wpt != null) {
-                api.show(wpt);
+            for (String iconName : new ArrayList<>(iconImages.keySet())) {
+                removeIcon(listener, iconName);
             }
-        });
+            model.icons().forEach((name, icon) -> addIcon(listener, name, icon));
+
+            model.waypoints().getWaypoints(null).forEach(waypoint -> {
+                var wpt = toJourneyMap(waypoint);
+                if (wpt != null) {
+                    api.show(wpt);
+                }
+            });
+        } finally {
+            initializing = false;
+        }
     }
 
     @Override
@@ -167,6 +206,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         for (var waypoint : api.getAllWaypoints()) {
             if (name.equals(waypoint.getName())) {
                 waypoint.setDisplayDimensions(dimensions.stream().map(dim -> dim.location().toString()).toArray(String[]::new));
+                refresh(waypoint);
             }
         }
     }
@@ -178,6 +218,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 String[] dims = waypoint.getDisplayDimensions();
                 if (dims.length != 0) {
                     waypoint.setPosition(dims[0], pos);
+                    refresh(waypoint);
                 }
             }
         }
@@ -188,6 +229,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         for (var waypoint : api.getAllWaypoints()) {
             if (name.equals(waypoint.getName())) {
                 waypoint.setColor(color);
+                refresh(waypoint);
             }
         }
     }
@@ -202,16 +244,65 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
     @Override
     public void addIcon(ClientPacketListener handler, String name, byte[] icon) {
+        NativeImage image;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            image = NativeImage.read(stack.bytes(icon));
+        } catch (IOException e) {
+            LOGGER.warn("Failed to read image", e);
+            return;
+        }
+        iconImages.put(name, image);
 
+        if (!initializing) {
+            Model model = Model.get(handler);
+            for (var waypoint : api.getAllWaypoints()) {
+                Waypoint modelWaypoint = model.waypoints().getWaypoint(waypoint.getName());
+                if (modelWaypoint != null && name.equals(modelWaypoint.icon())) {
+                    waypoint.setIcon(new MapImage(image, 0, 0, ICON_SIZE, ICON_SIZE, modelWaypoint.color(), 1));
+                    refresh(waypoint);
+                }
+            }
+        }
     }
 
     @Override
     public void removeIcon(ClientPacketListener handler, String name) {
+        NativeImage image = iconImages.remove(name);
+        if (image == null) {
+            return;
+        }
 
+        if (!initializing) {
+            Model model = Model.get(handler);
+            for (var waypoint : api.getAllWaypoints()) {
+                Waypoint modelWaypoint = model.waypoints().getWaypoint(waypoint.getName());
+                if (modelWaypoint != null && name.equals(modelWaypoint.icon())) {
+                    waypoint.setIcon(null);
+                    refresh(waypoint);
+                }
+            }
+        }
+
+        image.close();
     }
 
     @Override
     public void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon) {
+        Model model = Model.get(handler);
+        if (icon != null && !model.icons().containsKey(icon)) {
+            return;
+        }
 
+        NativeImage image = icon == null ? null : iconImages.get(icon);
+        if (icon != null && image == null) {
+            return;
+        }
+
+        for (var wpt : api.getAllWaypoints()) {
+            if (waypoint.equals(wpt.getName())) {
+                wpt.setIcon(image == null ? null : new MapImage(image, 0, 0, ICON_SIZE, ICON_SIZE, Objects.requireNonNullElse(wpt.getColor(), 0xffffff), 1));
+                refresh(wpt);
+            }
+        }
     }
 }

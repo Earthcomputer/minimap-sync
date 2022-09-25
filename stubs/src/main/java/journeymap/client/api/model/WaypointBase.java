@@ -2,6 +2,8 @@ package journeymap.client.api.model;
 
 import journeymap.client.api.display.Displayable;
 
+import javax.annotation.Nullable;
+
 @SuppressWarnings("unchecked")
 public class WaypointBase<T extends WaypointBase<T>> extends Displayable {
     public final String getName() {
@@ -22,5 +24,9 @@ public class WaypointBase<T extends WaypointBase<T>> extends Displayable {
 
     public MapImage getIcon() {
         return null;
+    }
+
+    public final T setIcon(@Nullable MapImage icon) {
+        return (T) this;
     }
 }

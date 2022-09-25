@@ -6,10 +6,15 @@
   "plugin": "net.earthcomputer.minimapsync.MixinConfigPlugin",
   "mixins": [
     "MinecraftServerMixin",
-    "ServerGamePacketListenerImplMixin"
+    "ServerGamePacketListenerImplMixin",
+    "journeymap.LogFormatterMixin"
   ],
   "client": [
     "ClientPacketListenerMixin",
+    "journeymap.PluginWrapperMixin",
+    "journeymap.TextureCacheMixin",
+    "journeymap.WaypointEditorMixin",
+    "journeymap.WaypointMixin",
     "voxelmap.GuiAddWaypointMixin",
     "voxelmap.GuiPersistentMapMixin",
     "voxelmap.GuiWaypointsMixin",
