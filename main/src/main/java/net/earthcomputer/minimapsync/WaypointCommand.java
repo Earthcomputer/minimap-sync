@@ -7,10 +7,12 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -72,6 +74,18 @@ public class WaypointCommand {
     private static final SimpleCommandExceptionType INVALID_IMAGE_FORMAT_EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("Invalid image format"));
     private static final DynamicCommandExceptionType NO_SUCH_ICON_EXCEPTION = new DynamicCommandExceptionType(name -> Component.nullToEmpty("No such icon: " + name));
 
+    private static final SuggestionProvider<CommandSourceStack> WAYPOINT_NAME_SUGGESTOR = (context, builder) -> {
+        Model model = Model.get(context.getSource().getServer());
+        return SharedSuggestionProvider.suggest(
+            model.waypoints().getWaypoints(null).map(Waypoint::name),
+            builder
+        );
+    };
+    private static final SuggestionProvider<CommandSourceStack> ICON_NAME_SUGGESTOR = (context, builder) -> {
+        Model model = Model.get(context.getSource().getServer());
+        return SharedSuggestionProvider.suggest(model.icons().keySet(), builder);
+    };
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(literal("waypoint")
             .then(literal("reload")
@@ -85,9 +99,11 @@ public class WaypointCommand {
                             .executes(ctx -> addWaypoint(ctx.getSource(), getString(ctx, "name"), getSpawnablePos(ctx, "pos"), getString(ctx, "description")))))))
             .then(literal("del")
                 .then(argument("name", string())
+                    .suggests(WAYPOINT_NAME_SUGGESTOR)
                     .executes(ctx -> delWaypoint(ctx.getSource(), getString(ctx, "name")))))
             .then(literal("edit")
                 .then(argument("name", string())
+                    .suggests(WAYPOINT_NAME_SUGGESTOR)
                     .then(argument("description", greedyString())
                         .executes(ctx -> editWaypoint(ctx.getSource(), getString(ctx, "name"), getString(ctx, "description"))))))
             .then(literal("list")
@@ -102,6 +118,7 @@ public class WaypointCommand {
                     })))
             .then(literal("tp")
                 .then(argument("name", string())
+                    .suggests(WAYPOINT_NAME_SUGGESTOR)
                     .executes(ctx -> tpWaypoint(ctx.getSource(), getString(ctx, "name"), ctx.getSource().getLevel()))
                     .then(argument("dimension", dimension())
                         .executes(ctx -> tpWaypoint(ctx.getSource(), getString(ctx, "name"), getDimension(ctx, "dimension"))))))
@@ -127,13 +144,17 @@ public class WaypointCommand {
                             .executes(ctx -> addIcon(ctx.getSource(), getString(ctx, "name"), getString(ctx, "url"))))))
                 .then(literal("del")
                     .then(argument("name", string())
+                        .suggests(ICON_NAME_SUGGESTOR)
                         .executes(ctx -> delIcon(ctx.getSource(), getString(ctx, "name")))))
                 .then(literal("set")
                     .then(argument("waypoint", string())
+                        .suggests(WAYPOINT_NAME_SUGGESTOR)
                         .then(argument("icon", string())
+                            .suggests(ICON_NAME_SUGGESTOR)
                             .executes(ctx -> setWaypointIcon(ctx.getSource(), getString(ctx, "waypoint"), getString(ctx, "icon"))))))
                 .then(literal("unset")
                     .then(argument("waypoint", string())
+                        .suggests(WAYPOINT_NAME_SUGGESTOR)
                         .executes(ctx -> unsetWaypointIcon(ctx.getSource(), getString(ctx, "waypoint")))))));
     }
 
