@@ -64,7 +64,7 @@ public abstract class GuiAddWaypointMixin extends Screen {
         }
     }
 
-    @ModifyVariable(method = "render", at = @At(value = "STORE", ordinal = 0), ordinal = 0)
+    @ModifyVariable(method = {"render", "method_25394"}, at = @At(value = "STORE", ordinal = 0), ordinal = 0)
     private TextureAtlas modifyAtlas(TextureAtlas atlas) {
         if (MinimapSyncClient.isCompatibleServer()) {
             return waypointManager.getTextureAtlas();

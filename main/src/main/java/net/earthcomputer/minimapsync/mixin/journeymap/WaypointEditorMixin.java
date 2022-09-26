@@ -129,7 +129,7 @@ public class WaypointEditorMixin extends JmUI {
         }
     }
 
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
+    @Inject(method = {"render", "method_25394"}, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
     private void redrawWaypoint(PoseStack poseStack, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
