@@ -63,6 +63,9 @@ public class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void onInit(CallbackInfo ci) {
+        if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
         Model model = Model.get(Minecraft.getInstance().getConnection());
         var waypoint = model.waypoints().getWaypoint(originalWaypoint.getName());
         minimapsync_iconName = waypoint == null ? null : waypoint.icon();
@@ -70,6 +73,9 @@ public class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;getRenderables()Ljava/util/List;", ordinal = 1))
     private void addIconButton(CallbackInfo ci) {
+        if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
         minimapsync_iconButton = addRenderableWidget(
             new Button(20, 20, "", button -> minecraft.setScreen(new ChooseIconScreen(
                 this,
@@ -114,6 +120,9 @@ public class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "drawWaypoint", at = @At("HEAD"), cancellable = true)
     private void onLayoutButtons(PoseStack mStack, int x, int y, CallbackInfo ci) {
+        if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
         if (!minimapsync_isRedrawingWaypoint) {
             minimapsync_iconButton.setPosition(x - 2, y - 10);
             ci.cancel();
@@ -122,6 +131,9 @@ public class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
     private void redrawWaypoint(PoseStack poseStack, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
         minimapsync_isRedrawingWaypoint = true;
         try {
             drawWaypoint(poseStack, minimapsync_iconButton.x + 2, minimapsync_iconButton.y + 10);
@@ -132,6 +144,9 @@ public class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "save", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;updateWaypointFromForm()V"))
     private void onSave(CallbackInfo ci) {
+        if (!MinimapSyncClient.isCompatibleServer()) {
+            return;
+        }
         Model model = Model.get(Minecraft.getInstance().getConnection());
         String name = originalWaypoint.getName();
         model.waypoints().setIcon(name, minimapsync_iconName);
@@ -153,7 +168,7 @@ public class WaypointEditorMixin extends JmUI {
 
     @Override
     public void removed() {
-        if (minimapsync_iconNeedsClosing) {
+        if (MinimapSyncClient.isCompatibleServer() && minimapsync_iconNeedsClosing) {
             wpTexture.remove();
         }
         super.removed();
