@@ -19,6 +19,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -171,6 +172,26 @@ public enum VoxelMapCompat implements IMinimapCompat {
         }
     }
 
+    private void addWaypoint(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
+        // VoxelMap's addWaypoint method assumes the player is in the same dimension as the waypoint
+        // being added. If that's not the case, we use an equivalent of loadWaypoint that doesn't
+        // reconstruct the Waypoint.
+
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
+        }
+        ResourceLocation location = level.dimension().location();
+        if (waypoint.dimensions.stream().anyMatch(dim -> location.equals(dim.resourceLocation))) {
+            AbstractVoxelMap.getInstance().getWaypointManager().addWaypoint(waypoint);
+        } else {
+            var wayPts = AbstractVoxelMap.getInstance().getWaypointManager().getWaypoints();
+            if (!wayPts.contains(waypoint)) {
+                wayPts.add(waypoint);
+            }
+        }
+    }
+
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
         serverKnownWaypoints.clear();
@@ -183,7 +204,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
-            waypointManager.addWaypoint(toVoxel(waypoint));
+            addWaypoint(toVoxel(waypoint));
         }
 
         icons.clear();
@@ -235,7 +256,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         serverKnownWaypoints.add(waypoint);
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
-        waypointManager.addWaypoint(toVoxel(waypoint));
+        addWaypoint(toVoxel(waypoint));
         waypointManager.saveWaypoints();
     }
 
