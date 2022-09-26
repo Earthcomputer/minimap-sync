@@ -10,10 +10,14 @@ import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
@@ -240,6 +244,30 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
 
     @Override
     public void setWaypointTeleportRule(ClientPacketListener handler, WaypointTeleportRule rule) {
+    }
+
+    public static boolean teleport(journeymap.client.waypoint.Waypoint waypoint) {
+        if (waypoint.getType() == journeymap.client.waypoint.Waypoint.Type.Death) {
+            return false;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return false;
+        }
+        if (!Model.get(player.connection).teleportRule().canTeleport(player)) {
+            return false;
+        }
+        if (!ClientPlayNetworking.canSend(MinimapSync.TELEPORT)) {
+            return false;
+        }
+
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(waypoint.getName(), 256);
+        buf.writeBoolean(false); // null dimension type (current dimension)
+        ClientPlayNetworking.send(MinimapSync.TELEPORT, buf);
+
+        return true;
     }
 
     @Override

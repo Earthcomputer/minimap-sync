@@ -11,6 +11,7 @@
   ],
   "client": [
     "ClientPacketListenerMixin",
+    "journeymap.CmdTeleportWaypointMixin",
     "journeymap.PluginWrapperMixin",
     "journeymap.TextureCacheMixin",
     "journeymap.WaypointEditorMixin",

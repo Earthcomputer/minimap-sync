@@ -28,4 +28,12 @@ public class Waypoint {
     public ResourceLocation getIcon() {
         return new ResourceLocation("");
     }
+
+    public Type getType() {
+        return Type.Death;
+    }
+
+    public enum Type {
+        Death
+    }
 }
