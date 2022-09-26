@@ -3,11 +3,14 @@ package net.earthcomputer.minimapsync;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -45,9 +48,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
+import static com.mojang.brigadier.arguments.IntegerArgumentType.*;
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.commands.Commands.*;
 import static net.minecraft.commands.arguments.DimensionArgument.*;
@@ -76,15 +83,53 @@ public class WaypointCommand {
 
     private static final SuggestionProvider<CommandSourceStack> WAYPOINT_NAME_SUGGESTOR = (context, builder) -> {
         Model model = Model.get(context.getSource().getServer());
-        return SharedSuggestionProvider.suggest(
+        return suggestMatching(
             model.waypoints().getWaypoints(null).map(Waypoint::name),
             builder
         );
     };
     private static final SuggestionProvider<CommandSourceStack> ICON_NAME_SUGGESTOR = (context, builder) -> {
         Model model = Model.get(context.getSource().getServer());
-        return SharedSuggestionProvider.suggest(model.icons().keySet(), builder);
+        return suggestMatching(model.icons().keySet().stream(), builder);
     };
+
+    private static CompletableFuture<Suggestions> suggestMatching(
+        Stream<String> collection,
+        SuggestionsBuilder builder
+    ) {
+        String existingString = builder.getRemaining().toLowerCase(Locale.ROOT);
+        collection.forEach(suggestion -> {
+            if (!existingString.isEmpty()) {
+                char quoteChar = existingString.charAt(0);
+                if (StringReader.isQuotedStringStart(quoteChar)) {
+                    String escaped = suggestion.replace("\\", "\\\\").replace("" + quoteChar, "\\" + quoteChar);
+                    if (SharedSuggestionProvider.matchesSubStr(existingString.substring(1), escaped.toLowerCase(Locale.ROOT))) {
+                        builder.suggest(quoteChar + escaped + quoteChar);
+                    }
+                    return;
+                }
+            }
+
+            if (!SharedSuggestionProvider.matchesSubStr(existingString, suggestion.toLowerCase(Locale.ROOT))) {
+                return;
+            }
+
+            boolean needsQuotes = false;
+            for (int i = 0; i < suggestion.length(); i++) {
+                if (!StringReader.isAllowedInUnquotedString(suggestion.charAt(i))) {
+                    needsQuotes = true;
+                    break;
+                }
+            }
+            if (needsQuotes) {
+                String escaped = suggestion.replace("\\", "\\\\").replace("\"", "\\\"");
+                builder.suggest("\"" + escaped + "\"");
+            } else {
+                builder.suggest(suggestion);
+            }
+        });
+        return builder.buildFuture();
+    }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(literal("waypoint")
@@ -106,6 +151,11 @@ public class WaypointCommand {
                     .suggests(WAYPOINT_NAME_SUGGESTOR)
                     .then(argument("description", greedyString())
                         .executes(ctx -> editWaypoint(ctx.getSource(), getString(ctx, "name"), getString(ctx, "description"))))))
+            .then(literal("color")
+                .then(argument("name", string())
+                    .suggests(WAYPOINT_NAME_SUGGESTOR)
+                    .then(argument("color", integer(0, 0xffffff))
+                        .executes(ctx -> setWaypointColor(ctx.getSource(), getString(ctx, "name"), getInteger(ctx, "color"))))))
             .then(literal("list")
                 .executes(ctx -> listWaypoints(ctx.getSource(), null))
                 .then(argument("author", gameProfile())
@@ -178,7 +228,8 @@ public class WaypointCommand {
             pos,
             uuid,
             entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null,
-            null
+            null,
+            System.currentTimeMillis()
         );
 
         if (!MinimapSync.addWaypoint(null, source.getServer(), waypoint)) {
@@ -206,6 +257,16 @@ public class WaypointCommand {
         }
 
         source.sendSuccess(Component.nullToEmpty("Waypoint edited: " + name), true);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int setWaypointColor(CommandSourceStack source, String name, int color) throws CommandSyntaxException {
+        if (!MinimapSync.setWaypointColor(null, source.getServer(), name, color)) {
+            throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
+        }
+
+        source.sendSuccess(Component.nullToEmpty("Set waypoint color of " + name + " to " + color), true);
 
         return Command.SINGLE_SUCCESS;
     }
