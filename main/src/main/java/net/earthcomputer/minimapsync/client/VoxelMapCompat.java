@@ -64,7 +64,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
 
-        return new com.mamiyaotaru.voxelmap.util.Waypoint(
+        var result = new com.mamiyaotaru.voxelmap.util.Waypoint(
             waypoint.name(),
             waypoint.pos().getX(),
             waypoint.pos().getZ(),
@@ -79,6 +79,9 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 .map(dim -> dimensionManager.getDimensionContainerByIdentifier(dim.location().toString()))
                 .collect(Collectors.toCollection(TreeSet::new))
         );
+        ClientLevel level = Minecraft.getInstance().level;
+        result.inDimension = level == null || waypoint.dimensions().contains(level.dimension());
+        return result;
     }
 
     public static Waypoint fromVoxel(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
@@ -172,26 +175,6 @@ public enum VoxelMapCompat implements IMinimapCompat {
         }
     }
 
-    private void addWaypoint(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
-        // VoxelMap's addWaypoint method assumes the player is in the same dimension as the waypoint
-        // being added. If that's not the case, we use an equivalent of loadWaypoint that doesn't
-        // reconstruct the Waypoint.
-
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
-            return;
-        }
-        ResourceLocation location = level.dimension().location();
-        if (waypoint.dimensions.stream().anyMatch(dim -> location.equals(dim.resourceLocation))) {
-            AbstractVoxelMap.getInstance().getWaypointManager().addWaypoint(waypoint);
-        } else {
-            var wayPts = AbstractVoxelMap.getInstance().getWaypointManager().getWaypoints();
-            if (!wayPts.contains(waypoint)) {
-                wayPts.add(waypoint);
-            }
-        }
-    }
-
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
         serverKnownWaypoints.clear();
@@ -204,7 +187,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
-            addWaypoint(toVoxel(waypoint));
+            waypointManager.addWaypoint(toVoxel(waypoint));
         }
 
         icons.clear();
@@ -256,7 +239,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         serverKnownWaypoints.add(waypoint);
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
-        addWaypoint(toVoxel(waypoint));
+        waypointManager.addWaypoint(toVoxel(waypoint));
         waypointManager.saveWaypoints();
     }
 

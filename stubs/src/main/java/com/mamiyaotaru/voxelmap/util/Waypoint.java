@@ -12,6 +12,7 @@ public class Waypoint {
     public float red;
     public float green;
     public float blue;
+    public boolean inDimension = true;
 
     public Waypoint(
         String name,
