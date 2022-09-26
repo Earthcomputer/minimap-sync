@@ -120,4 +120,9 @@ public final class WaypointList {
             return waypoints.stream().filter(waypoint -> author.equals(waypoint.author()));
         }
     }
+
+    void setAllToCurrentTime() {
+        long time = System.currentTimeMillis();
+        waypoints.replaceAll(waypoint -> waypoint.withCreationTime(time));
+    }
 }

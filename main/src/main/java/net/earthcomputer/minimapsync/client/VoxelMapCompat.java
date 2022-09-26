@@ -95,7 +95,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
             Minecraft.getInstance().getUser().getGameProfile().getId(),
             Minecraft.getInstance().getUser().getGameProfile().getName(),
-            undecorateIconNameSuffix(waypoint.imageSuffix)
+            undecorateIconNameSuffix(waypoint.imageSuffix),
+            System.currentTimeMillis()
         );
     }
 

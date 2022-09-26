@@ -44,7 +44,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MinimapSync implements ModInitializer {
-    public static final int CURRENT_PROTOCOL_VERSION = 1;
+    public static final int CURRENT_PROTOCOL_VERSION = 2;
     public static final ResourceLocation PROTOCOL_VERSION = new ResourceLocation("minimapsync:protocol_version");
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
     public static final ResourceLocation ADD_WAYPOINT = new ResourceLocation("minimapsync:add_waypoint");
@@ -90,7 +90,7 @@ public class MinimapSync implements ModInitializer {
             }
         });
         ServerPlayNetworking.registerGlobalReceiver(ADD_WAYPOINT, (server, player, handler, buf, responseSender) -> {
-            Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf);
+            Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf).withCreationTime(System.currentTimeMillis());
             server.execute(() -> addWaypoint(player, server, waypoint.withAuthor(player.getUUID()).withAuthorName(player.getGameProfile().getName())));
         });
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_WAYPOINT, (server, player, handler, buf, responseSender) -> {

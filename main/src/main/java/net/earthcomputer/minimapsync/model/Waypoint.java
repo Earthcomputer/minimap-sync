@@ -20,7 +20,8 @@ public record Waypoint(
     BlockPos pos,
     @Nullable UUID author,
     @Nullable String authorName,
-    @Nullable String icon
+    @Nullable String icon,
+    long creationTime
 ) {
     public static final int MIN_ICON_DIMENSIONS = 16;
     public static final int MAX_ICON_DIMENSIONS = 128;
@@ -34,7 +35,8 @@ public record Waypoint(
             buf.readBlockPos(),
             FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUUID),
             FriendlyByteBufUtil.readNullable(buf, buf1 -> buf1.readUtf(16)),
-            protocolVersion >= 1 ? FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf) : null
+            protocolVersion >= 1 ? FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf) : null,
+            protocolVersion >= 2 ? buf.readLong() : System.currentTimeMillis()
         );
     }
 
@@ -49,33 +51,40 @@ public record Waypoint(
         if (protocolVersion >= 1) {
             FriendlyByteBufUtil.writeNullable(buf, icon, FriendlyByteBuf::writeUtf);
         }
+        if (protocolVersion >= 2) {
+            buf.writeLong(creationTime);
+        }
     }
 
     public Waypoint withDescription(@Nullable String description) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withDimensions(Set<ResourceKey<Level>> dimensions) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withPos(BlockPos pos) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withColor(int color) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withAuthor(@Nullable UUID author) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withAuthorName(@Nullable String authorName) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 
     public Waypoint withIcon(@Nullable String icon) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
+    }
+
+    public Waypoint withCreationTime(long creationTime) {
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime);
     }
 }
