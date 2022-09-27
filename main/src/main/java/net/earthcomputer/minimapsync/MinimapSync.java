@@ -342,7 +342,7 @@ public class MinimapSync implements ModInitializer {
 
     public static boolean addIcon(MinecraftServer server, String name, byte[] icon) {
         Model model = Model.get(server);
-        if (model.icons().containsKey(name)) {
+        if (model.icons().names().contains(name)) {
             return false;
         }
         model.icons().put(name, icon);

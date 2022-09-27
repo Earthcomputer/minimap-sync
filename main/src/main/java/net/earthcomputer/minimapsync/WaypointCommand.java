@@ -90,7 +90,7 @@ public class WaypointCommand {
     };
     private static final SuggestionProvider<CommandSourceStack> ICON_NAME_SUGGESTOR = (context, builder) -> {
         Model model = Model.get(context.getSource().getServer());
-        return suggestMatching(model.icons().keySet().stream(), builder);
+        return suggestMatching(model.icons().names().stream(), builder);
     };
 
     private static CompletableFuture<Suggestions> suggestMatching(
@@ -383,7 +383,7 @@ public class WaypointCommand {
         source.sendSuccess(MinimapSync.createComponent("""
             {"text": "=== List of %d icons ===", "color": "aqua", "bold": "true"}
         """, model.icons().size()), false);
-        for (String icon : model.icons().keySet()) {
+        for (String icon : model.icons().names()) {
             source.sendSuccess(MinimapSync.createComponent("""
                 [
                     "- ",
@@ -397,7 +397,7 @@ public class WaypointCommand {
 
     private static int addIcon(CommandSourceStack source, String name, String url) throws CommandSyntaxException {
         Model model = Model.get(source.getServer());
-        if (model.icons().containsKey(name)) {
+        if (model.icons().names().contains(name)) {
             throw DUPLICATE_ICON_EXCEPTION.create(name);
         }
 
@@ -510,7 +510,7 @@ public class WaypointCommand {
 
     private static int setWaypointIcon(CommandSourceStack source, String waypoint, String icon) throws CommandSyntaxException {
         Model model = Model.get(source.getServer());
-        if (!model.icons().containsKey(icon)) {
+        if (!model.icons().names().contains(icon)) {
             throw NO_SUCH_ICON_EXCEPTION.create(icon);
         }
         if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, icon)) {

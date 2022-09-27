@@ -80,7 +80,7 @@ public class ChooseIconScreen extends Screen {
             ClientPacketListener connection = minecraft.getConnection();
             if (connection != null) {
                 Model model = Model.get(connection);
-                for (String icon : (Iterable<String>) model.icons().keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER)::iterator) {
+                for (String icon : (Iterable<String>) model.icons().names().stream().sorted(String.CASE_INSENSITIVE_ORDER)::iterator) {
                     selectionList.addInitialEntry(icon, Objects.requireNonNullElse(iconRendererSupplier.apply(icon), IconSelectionList.IconRenderer.NOOP));
                 }
             }

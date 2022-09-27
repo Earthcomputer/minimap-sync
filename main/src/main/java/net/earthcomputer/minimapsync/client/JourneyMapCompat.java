@@ -318,7 +318,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     @Override
     public void setWaypointIcon(ClientPacketListener handler, String waypoint, @Nullable String icon) {
         Model model = Model.get(handler);
-        if (icon != null && !model.icons().containsKey(icon)) {
+        if (icon != null && !model.icons().names().contains(icon)) {
             return;
         }
 

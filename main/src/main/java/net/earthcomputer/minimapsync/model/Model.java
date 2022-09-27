@@ -5,7 +5,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import marcono1234.gson.recordadapter.RecordTypeAdapterFactory;
-import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.ducks.IHasModel;
 import net.fabricmc.api.EnvType;
@@ -26,32 +25,33 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 
 public record Model(
     int formatVersion,
     WaypointList waypoints,
     WaypointTeleportRule teleportRule,
-    Map<String, byte[]> icons
+    Icons icons
 ) {
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final Gson GSON = new GsonBuilder()
-        .registerTypeAdapter(byte[].class, Base64Serializer.INSTANCE)
-        .registerTypeAdapter(BlockPos.class, BlockPosSerializer.INSTANCE)
-        .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registry.DIMENSION_REGISTRY))
-        .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
-        .registerTypeAdapterFactory(RecordTypeAdapterFactory.builder().allowMissingComponentValues().create())
-        .disableHtmlEscaping()
-        .setPrettyPrinting()
-        .create();
+
+    private static Gson getGson(MinecraftServer server) {
+        return new GsonBuilder()
+            .registerTypeAdapter(BlockPos.class, BlockPosSerializer.INSTANCE)
+            .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registry.DIMENSION_REGISTRY))
+            .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
+            .registerTypeAdapterFactory(RecordTypeAdapterFactory.builder().allowMissingComponentValues().create())
+            .registerTypeAdapter(Icons.class, new IconsSerializer(server.getWorldPath(LevelResource.ROOT).resolve("minimapsync_icons")))
+            .disableHtmlEscaping()
+            .setPrettyPrinting()
+            .create();
+    }
 
     public Model() {
         this(
             MinimapSync.CURRENT_PROTOCOL_VERSION,
             new WaypointList(),
             WaypointTeleportRule.NEVER,
-            new HashMap<>()
+            new Icons()
         );
     }
 
@@ -60,7 +60,7 @@ public record Model(
             protocolVersion,
             new WaypointList(protocolVersion, buf),
             buf.readEnum(WaypointTeleportRule.class),
-            protocolVersion >= 1 ? FriendlyByteBufUtil.readMap(buf, HashMap::new, FriendlyByteBuf::readUtf, FriendlyByteBuf::readByteArray) : new HashMap<>()
+            protocolVersion >= 1 ? new Icons(buf) : new Icons()
         );
     }
 
@@ -68,7 +68,7 @@ public record Model(
         waypoints.toPacket(protocolVersion, buf);
         buf.writeEnum(teleportRule);
         if (protocolVersion >= 1) {
-            FriendlyByteBufUtil.writeMap(buf, icons, FriendlyByteBuf::writeUtf, FriendlyByteBuf::writeByteArray);
+            icons.toPacket(buf);
         }
     }
 
@@ -79,7 +79,7 @@ public record Model(
     public static Model load(MinecraftServer server) {
         Path file = getSavePath(server);
         try (var reader = Files.newBufferedReader(file)) {
-            Model result = GSON.fromJson(reader, Model.class);
+            Model result = getGson(server).fromJson(reader, Model.class);
             if (result != null) {
                 return updateLoadedModel(server, result);
             }
@@ -101,7 +101,7 @@ public record Model(
 
         // added icons field
         if (model.icons == null) {
-            model = model.withIcons(new HashMap<>());
+            model = model.withIcons(new Icons());
         }
 
         // added waypoint creation time
@@ -117,7 +117,7 @@ public record Model(
         Path file = getSavePath(server);
         Path newFile = file.resolveSibling("minimapsync.json.new");
         try (var writer = Files.newBufferedWriter(newFile)) {
-            GSON.toJson(model, writer);
+            getGson(server).toJson(model, writer);
         } catch (IOException e) {
             LOGGER.error(() -> "Failed to save model file: " + newFile, e);
             return;
@@ -133,7 +133,7 @@ public record Model(
         return new Model(formatVersion, waypoints, teleportRule, icons);
     }
 
-    public Model withIcons(Map<String, byte[]> icons) {
+    public Model withIcons(Icons icons) {
         return new Model(formatVersion, waypoints, teleportRule, icons);
     }
 
