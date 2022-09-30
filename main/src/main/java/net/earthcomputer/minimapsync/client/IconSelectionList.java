@@ -137,12 +137,12 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
                     || !Mth.isPowerOfTwo(image.getWidth())
                 ) {
                     image.close();
-                    return Either.right("Image must be a square power of two between " + Waypoint.MIN_ICON_DIMENSIONS + "x" + Waypoint.MIN_ICON_DIMENSIONS + " and " + Waypoint.MAX_ICON_DIMENSIONS + "x" + Waypoint.MAX_ICON_DIMENSIONS + " pixels");
+                    return Either.right(file.getFileName() + ": Image must be a square power of two between " + Waypoint.MIN_ICON_DIMENSIONS + "x" + Waypoint.MIN_ICON_DIMENSIONS + " and " + Waypoint.MAX_ICON_DIMENSIONS + "x" + Waypoint.MAX_ICON_DIMENSIONS + " pixels, but was " + image.getWidth() + "x" + image.getHeight());
                 }
                 return Either.left(list.new Entry(name, file.toString(), image));
             } catch (IOException e) {
-                LOGGER.warn("Unable to read image", e);
-                return Either.right("Unable to read image: " + e);
+                LOGGER.warn(file.getFileName() + ": Unable to read image", e);
+                return Either.right(file.getFileName() + ": Unable to read image: " + e);
             }
         }
 
