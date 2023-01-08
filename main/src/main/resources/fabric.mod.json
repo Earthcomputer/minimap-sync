@@ -28,7 +28,7 @@
   "accessWidener": "minimapsync.accesswidener",
   "depends": {
     "fabric": "*",
-    "minecraft": ">=1.17"
+    "minecraft": ">=1.19"
   },
   "custom": {
     "multiconnect": {
