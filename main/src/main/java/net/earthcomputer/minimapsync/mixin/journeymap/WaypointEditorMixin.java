@@ -136,7 +136,7 @@ public class WaypointEditorMixin extends JmUI {
         }
         minimapsync_isRedrawingWaypoint = true;
         try {
-            drawWaypoint(poseStack, minimapsync_iconButton.x + 2, minimapsync_iconButton.y + 10);
+            drawWaypoint(poseStack, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
         } finally {
             minimapsync_isRedrawingWaypoint = false;
         }

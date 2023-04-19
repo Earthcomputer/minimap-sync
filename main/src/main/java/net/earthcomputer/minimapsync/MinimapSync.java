@@ -12,7 +12,7 @@ import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.S2CPlayChannelEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -99,7 +99,7 @@ public class MinimapSync implements ModInitializer {
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_DIMENSIONS, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY));
+            Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registries.DIMENSION));
             server.execute(() -> setWaypointDimensions(player, server, name, dimensions));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_POS, (server, player, handler, buf, responseSender) -> {
@@ -119,7 +119,7 @@ public class MinimapSync implements ModInitializer {
                 if (Model.get(server).teleportRule().canTeleport(player)) {
                     ServerLevel level = dimensionId == null
                         ? (ServerLevel) player.level
-                        : server.getLevel(ResourceKey.create(Registry.DIMENSION_REGISTRY, dimensionId));
+                        : server.getLevel(ResourceKey.create(Registries.DIMENSION, dimensionId));
                     if (level != null) {
                         try {
                             teleportToWaypoint(server, player, name, level);

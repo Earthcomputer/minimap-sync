@@ -1,7 +1,7 @@
 package journeymap.client.ui.component;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.components.Widget;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -13,7 +13,7 @@ public abstract class JmUI extends Screen {
         super(Component.nullToEmpty(title));
     }
 
-    public List<Widget> getRenderables() {
+    public List<AbstractWidget> getRenderables() {
         return Collections.emptyList();
     }
 

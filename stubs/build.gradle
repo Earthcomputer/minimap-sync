@@ -16,6 +16,6 @@ dependencies {
     minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
     mappings loom.layered {
         officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${rootProject.minecraft_version}:${rootProject.parchment_version}@zip")
+        parchment("org.parchmentmc.data:parchment-${rootProject.parchment_mc_version}:${rootProject.parchment_version}@zip")
     }
 }

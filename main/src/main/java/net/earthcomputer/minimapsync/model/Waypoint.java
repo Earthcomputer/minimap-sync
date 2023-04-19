@@ -2,7 +2,7 @@ package net.earthcomputer.minimapsync.model;
 
 import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -31,7 +31,7 @@ public record Waypoint(
             buf.readUtf(256),
             FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf),
             buf.readInt(),
-            FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY)),
+            FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registries.DIMENSION)),
             buf.readBlockPos(),
             FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUUID),
             FriendlyByteBufUtil.readNullable(buf, buf1 -> buf1.readUtf(16)),

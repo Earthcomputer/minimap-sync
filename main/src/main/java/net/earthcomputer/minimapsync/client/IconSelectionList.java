@@ -114,7 +114,7 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
     }
 
     @Override
-    protected boolean isFocused() {
+    public boolean isFocused() {
         return screen.getFocused() == this;
     }
 

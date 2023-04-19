@@ -16,7 +16,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -89,7 +89,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             null,
             (((int) (waypoint.red * 255) & 0xff) << 16) | (((int) (waypoint.green * 255) & 0xff) << 8) | ((int) (waypoint.blue * 255) & 0xff),
             waypoint.dimensions.stream()
-                .map(dim -> ResourceKey.create(Registry.DIMENSION_REGISTRY, dim.resourceLocation))
+                .map(dim -> ResourceKey.create(Registries.DIMENSION, dim.resourceLocation))
                 .collect(Collectors.toCollection(LinkedHashSet::new)),
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
             Minecraft.getInstance().getUser().getGameProfile().getId(),
@@ -129,7 +129,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 changed = true;
             } else {
                 Set<ResourceKey<Level>> voxelDimensions = voxelWaypoint.dimensions.stream()
-                    .map(dim -> ResourceKey.create(Registry.DIMENSION_REGISTRY, dim.resourceLocation))
+                    .map(dim -> ResourceKey.create(Registries.DIMENSION, dim.resourceLocation))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
                 if (!voxelDimensions.equals(serverWaypoint.dimensions())) {
                     serverWaypoint = serverWaypoint.withDimensions(voxelDimensions);

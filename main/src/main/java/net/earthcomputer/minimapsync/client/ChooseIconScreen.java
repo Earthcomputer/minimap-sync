@@ -86,38 +86,18 @@ public class ChooseIconScreen extends Screen {
             }
         }
         addWidget(selectionList);
-        doneButton = addRenderableWidget(new Button(
-            width / 2 - 154,
-            height - 52,
-            150,
-            20,
-            MinimapSync.createComponent("{\"translate\": \"gui.done\"}"),
-            button -> onDone()
-        ));
-        addRenderableWidget(new Button(
-            width / 2 + 4,
-            height - 52,
-            150,
-            20,
-            MinimapSync.createComponent("{\"translate\": \"gui.cancel\"}"),
-            button -> onClose()
-        ));
-        addRenderableWidget(new Button(
-            width / 2 - 154,
-            height - 28,
-            150,
-            20,
-            Component.nullToEmpty("Add New Icon"),
-            button -> onAdd()
-        ));
-        deleteButton = addRenderableWidget(new Button(
-            width / 2 + 4,
-            height - 28,
-            150,
-            20,
-            Component.nullToEmpty("Delete"),
-            button -> selectionList.removeSelectedEntry()
-        ));
+        doneButton = addRenderableWidget(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.done\"}"), button -> onDone())
+            .bounds(width / 2 - 154, height - 52, 150, 20)
+            .build());
+        addRenderableWidget(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.cancel\"}"), button -> onClose())
+            .bounds(width / 2 + 4, height - 52, 150, 20)
+            .build());
+        addRenderableWidget(Button.builder(Component.nullToEmpty("Add New Icon"), button -> onAdd())
+            .bounds(width / 2 - 154, height - 28, 150, 20)
+            .build());
+        deleteButton = addRenderableWidget(Button.builder(Component.nullToEmpty("Delete"), button -> selectionList.removeSelectedEntry())
+            .bounds(width / 2 + 4, height - 28, 150, 20)
+            .build());
         setInitialFocus(selectionList);
         if (firstInit) {
             for (IconSelectionList.Entry child : selectionList.children()) {
@@ -213,14 +193,9 @@ public class ChooseIconScreen extends Screen {
             ) {
                 @Override
                 protected void addButtons(int y) {
-                    addExitButton(new Button(
-                        width / 2 - 75,
-                        y,
-                        150,
-                        20,
-                        MinimapSync.createComponent("{\"translate\": \"gui.ok\"}"),
-                        button -> callback.accept(false)
-                    ));
+                    addExitButton(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.ok\"}"), button -> callback.accept(false))
+                        .bounds(width / 2 - 75, y, 150, 20)
+                        .build());
                 }
             });
         }
