@@ -1,6 +1,6 @@
 package com.mamiyaotaru.voxelmap.gui;
 
-import com.mamiyaotaru.voxelmap.interfaces.IWaypointManager;
+import com.mamiyaotaru.voxelmap.WaypointManager;
 import com.mamiyaotaru.voxelmap.textures.Sprite;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -8,7 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 public class GuiAddWaypoint extends Screen {
-    IWaypointManager waypointManager;
+    WaypointManager waypointManager;
     protected Waypoint waypoint;
 
     protected GuiAddWaypoint(Component component) {

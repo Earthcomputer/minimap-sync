@@ -1,7 +1,7 @@
 package net.earthcomputer.minimapsync.mixin.voxelmap;
 
+import com.mamiyaotaru.voxelmap.WaypointManager;
 import com.mamiyaotaru.voxelmap.gui.GuiAddWaypoint;
-import com.mamiyaotaru.voxelmap.interfaces.IWaypointManager;
 import com.mamiyaotaru.voxelmap.textures.Sprite;
 import com.mamiyaotaru.voxelmap.textures.TextureAtlas;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
@@ -20,12 +20,10 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Slice;
 
-import java.util.Objects;
-
 @Mixin(GuiAddWaypoint.class)
 public abstract class GuiAddWaypointMixin extends Screen {
     @Shadow
-    IWaypointManager waypointManager;
+    WaypointManager waypointManager;
     @Shadow
     protected Waypoint waypoint;
 

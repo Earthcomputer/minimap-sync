@@ -1,8 +1,8 @@
 package net.earthcomputer.minimapsync.client;
 
-import com.mamiyaotaru.voxelmap.interfaces.AbstractVoxelMap;
-import com.mamiyaotaru.voxelmap.interfaces.IDimensionManager;
-import com.mamiyaotaru.voxelmap.interfaces.IWaypointManager;
+import com.mamiyaotaru.voxelmap.VoxelConstants;
+import com.mamiyaotaru.voxelmap.WaypointManager;
+import com.mamiyaotaru.voxelmap.util.DimensionManager;
 import com.mamiyaotaru.voxelmap.textures.TextureAtlas;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
@@ -60,8 +60,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
     }
 
     private static com.mamiyaotaru.voxelmap.util.Waypoint toVoxel(Waypoint waypoint) {
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
-        IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
+        DimensionManager dimensionManager = VoxelConstants.getVoxelMapInstance().getDimensionManager();
 
         var result = new com.mamiyaotaru.voxelmap.util.Waypoint(
             waypoint.name(),
@@ -104,7 +104,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             return;
         }
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
 
         // delete duplicate waypoints
         Set<String> seenNames = new HashSet<>();
@@ -180,7 +180,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
         serverKnownWaypoints.clear();
         model.waypoints().getWaypoints(null).forEach(serverKnownWaypoints::add);
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         for (var waypoint : new ArrayList<>(waypointManager.getWaypoints())) {
             if (!isDeathpoint(waypoint)) {
                 waypointManager.deleteWaypoint(waypoint);
@@ -238,7 +238,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     @Override
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         serverKnownWaypoints.add(waypoint);
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         waypointManager.addWaypoint(toVoxel(waypoint));
         waypointManager.saveWaypoints();
     }
@@ -246,7 +246,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     @Override
     public void removeWaypoint(ClientPacketListener listener, String name) {
         serverKnownWaypoints.removeIf(it -> name.equals(it.name()));
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         for (var waypoint : new ArrayList<>(waypointManager.getWaypoints())) {
             if (name.equals(waypoint.name)) {
                 waypointManager.deleteWaypoint(waypoint);
@@ -264,8 +264,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
 
-        IDimensionManager dimensionManager = AbstractVoxelMap.getInstance().getDimensionManager();
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        DimensionManager dimensionManager = VoxelConstants.getVoxelMapInstance().getDimensionManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         boolean changed = false;
         for (var waypoint : waypointManager.getWaypoints()) {
             if (name.equals(waypoint.name)) {
@@ -289,7 +289,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         boolean changed = false;
         for (var waypoint : waypointManager.getWaypoints()) {
             if (name.equals(waypoint.name)) {
@@ -313,7 +313,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         boolean changed = false;
         for (var waypoint : waypointManager.getWaypoints()) {
             if (name.equals(waypoint.name)) {
@@ -369,7 +369,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             return;
         }
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         TextureAtlas atlas = waypointManager.getTextureAtlas();
         atlas.registerIconForBufferedImage(decorateIconName(name), image);
         atlas.stitchNew();
@@ -396,7 +396,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
 
-        IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
+        WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
         boolean changed = false;
         for (var wpt : waypointManager.getWaypoints()) {
             if (waypoint.equals(wpt.name)) {
