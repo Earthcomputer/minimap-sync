@@ -220,7 +220,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 wayPts.add(newVoxelWaypoint);
             } else {
                 var voxelWaypoint = voxelWpts.get(0);
-                voxelWaypoint.dimensions = newVoxelWaypoint.dimensions;
+                voxelWaypoint.dimensions.clear();
+                voxelWaypoint.dimensions.addAll(newVoxelWaypoint.dimensions);
                 voxelWaypoint.x = newVoxelWaypoint.x;
                 voxelWaypoint.y = newVoxelWaypoint.y;
                 voxelWaypoint.z = newVoxelWaypoint.z;
@@ -269,9 +270,10 @@ public enum VoxelMapCompat implements IMinimapCompat {
         boolean changed = false;
         for (var waypoint : waypointManager.getWaypoints()) {
             if (name.equals(waypoint.name)) {
-                waypoint.dimensions = dimensions.stream()
-                    .map(dim -> dimensionManager.getDimensionContainerByIdentifier(dim.location().toString()))
-                    .collect(Collectors.toCollection(TreeSet::new));
+                waypoint.dimensions.clear();
+                for (ResourceKey<Level> dim : dimensions) {
+                    waypoint.dimensions.add(dimensionManager.getDimensionContainerByIdentifier(dim.location().toString()));
+                }
                 changed = true;
             }
         }

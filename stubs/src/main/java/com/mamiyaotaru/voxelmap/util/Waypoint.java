@@ -5,7 +5,7 @@ import java.util.TreeSet;
 public class Waypoint {
     public String name;
     public String imageSuffix;
-    public TreeSet<DimensionContainer> dimensions;
+    public final TreeSet<DimensionContainer> dimensions;
     public int x;
     public int y;
     public int z;
@@ -27,5 +27,6 @@ public class Waypoint {
         String world,
         TreeSet<DimensionContainer> dimensions
     ) {
+        this.dimensions = dimensions;
     }
 }
