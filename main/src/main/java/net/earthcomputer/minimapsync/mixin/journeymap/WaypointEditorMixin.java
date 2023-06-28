@@ -1,7 +1,6 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.vertex.PoseStack;
 import journeymap.client.texture.DynamicTextureImpl;
 import journeymap.client.texture.SimpleTextureImpl;
 import journeymap.client.texture.Texture;
@@ -16,6 +15,7 @@ import net.earthcomputer.minimapsync.client.JourneyMapCompat;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.model.Model;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
@@ -44,7 +44,7 @@ public class WaypointEditorMixin extends JmUI {
     private Waypoint editedWaypoint;
 
     @Shadow
-    protected void drawWaypoint(PoseStack mStack, int x, int y) {
+    protected void drawWaypoint(GuiGraphics guiGraphics, int x, int y) {
     }
 
     @Unique
@@ -119,7 +119,7 @@ public class WaypointEditorMixin extends JmUI {
     }
 
     @Inject(method = "drawWaypoint", at = @At("HEAD"), cancellable = true)
-    private void onLayoutButtons(PoseStack mStack, int x, int y, CallbackInfo ci) {
+    private void onLayoutButtons(GuiGraphics guiGraphics, int x, int y, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
@@ -130,13 +130,13 @@ public class WaypointEditorMixin extends JmUI {
     }
 
     @Inject(method = {"render", "method_25394"}, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
-    private void redrawWaypoint(PoseStack poseStack, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    private void redrawWaypoint(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
         minimapsync_isRedrawingWaypoint = true;
         try {
-            drawWaypoint(poseStack, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
+            drawWaypoint(guiGraphics, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
         } finally {
             minimapsync_isRedrawingWaypoint = false;
         }

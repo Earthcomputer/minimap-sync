@@ -3,16 +3,14 @@ package net.earthcomputer.minimapsync.client;
 import com.google.common.hash.Hashing;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Either;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -156,7 +154,7 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
 
         @Override
         public void render(
-            @NotNull PoseStack poseStack,
+            @NotNull GuiGraphics guiGraphics,
             int index,
             int top, int left,
             int width, int height,
@@ -165,8 +163,8 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
             float partialTick
         ) {
             Font font = Minecraft.getInstance().font;
-            font.draw(poseStack, name, left + 32 + 3, (float) (top + (height - font.lineHeight) / 2), 0xffffff);
-            iconRenderer.render(poseStack, left, top, 32, 32, 1, 1, 1);
+            guiGraphics.drawString(font, name, left + 32 + 3, top + (height - font.lineHeight) / 2, 0xffffff, false);
+            iconRenderer.render(guiGraphics, left, top, 32, 32, 1, 1, 1);
         }
 
         @Override
@@ -196,14 +194,14 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
     public interface IconRenderer extends AutoCloseable {
         IconRenderer NOOP = (poseStack, x, y, width, height, red, green, blue) -> {};
 
-        void render(PoseStack poseStack, int x, int y, int width, int height, float red, float green, float blue);
+        void render(GuiGraphics guiGraphics, int x, int y, int width, int height, float red, float green, float blue);
 
         @Override
         default void close() {}
 
         static IconRenderer makeRendererFromImage(String filePath, NativeImage image) {
             DynamicTexture texture = new DynamicTexture(image);
-            //noinspection UnstableApiUsage
+            @SuppressWarnings("deprecation")
             ResourceLocation textureLocation = new ResourceLocation(
                 "minimapsync",
                 "dynamic_icon_" + Util.sanitizeName(filePath, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(filePath)
@@ -226,12 +224,10 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
         }
 
         @Override
-        public void render(PoseStack poseStack, int x, int y, int width, int height, float red, float green, float blue) {
-            RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        public void render(GuiGraphics guiGraphics, int x, int y, int width, int height, float red, float green, float blue) {
             RenderSystem.setShaderColor(red, green, blue, 1);
-            RenderSystem.setShaderTexture(0, textureLocation);
             RenderSystem.enableBlend();
-            GuiComponent.blit(poseStack, x, y, 0, 0, width, height, width, height);
+            guiGraphics.blit(textureLocation, x, y, 0, 0, width, height, width, height);
             RenderSystem.disableBlend();
         }
     }

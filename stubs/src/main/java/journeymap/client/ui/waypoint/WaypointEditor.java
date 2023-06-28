@@ -1,8 +1,8 @@
 package journeymap.client.ui.waypoint;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import journeymap.client.ui.component.JmUI;
 import journeymap.client.waypoint.Waypoint;
+import net.minecraft.client.gui.GuiGraphics;
 
 public class WaypointEditor extends JmUI {
     private final Waypoint originalWaypoint = null;
@@ -16,11 +16,11 @@ public class WaypointEditor extends JmUI {
     public void init() {
     }
 
-    protected void drawWaypoint(PoseStack mStack, int x, int y) {
+    protected void drawWaypoint(GuiGraphics guiGraphics, int x, int y) {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
     }
 
     protected void save() {
