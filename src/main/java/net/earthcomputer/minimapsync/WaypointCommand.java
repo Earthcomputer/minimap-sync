@@ -137,7 +137,7 @@ public class WaypointCommand {
                 .executes(ctx -> reloadModel(ctx.getSource())))
             .then(literal("add")
                 .then(argument("name", string())
-                    .executes(ctx -> addWaypoint(ctx.getSource(), getString(ctx, "name"), new BlockPos(ctx.getSource().getPosition()), null))
+                    .executes(ctx -> addWaypoint(ctx.getSource(), getString(ctx, "name"), BlockPos.containing(ctx.getSource().getPosition()), null))
                     .then(argument("pos", blockPos())
                         .executes(ctx -> addWaypoint(ctx.getSource(), getString(ctx, "name"), getSpawnablePos(ctx, "pos"), null))
                         .then(argument("description", greedyString())

@@ -16,7 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -155,7 +155,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             Objects.requireNonNullElseGet(waypoint.getColor(), MinimapSync::randomColor),
             Arrays.stream(waypoint.getDisplayDimensions()).map(dim -> {
                 ResourceLocation location = ResourceLocation.tryParse(dim);
-                return location == null ? null : ResourceKey.create(Registry.DIMENSION_REGISTRY, location);
+                return location == null ? null : ResourceKey.create(Registries.DIMENSION, location);
             }).filter(Objects::nonNull).collect(Collectors.toSet()),
             pos,
             Minecraft.getInstance().getUser().getGameProfile().getId(),

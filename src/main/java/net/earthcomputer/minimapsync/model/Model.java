@@ -12,7 +12,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -37,7 +37,7 @@ public record Model(
     private static Gson getGson(MinecraftServer server) {
         return new GsonBuilder()
             .registerTypeAdapter(BlockPos.class, BlockPosSerializer.INSTANCE)
-            .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registry.DIMENSION_REGISTRY))
+            .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registries.DIMENSION))
             .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
             .registerTypeAdapterFactory(RecordTypeAdapterFactory.builder().allowMissingComponentValues().create())
             .registerTypeAdapter(Icons.class, new IconsSerializer(server.getWorldPath(LevelResource.ROOT).resolve("minimapsync_icons")))
