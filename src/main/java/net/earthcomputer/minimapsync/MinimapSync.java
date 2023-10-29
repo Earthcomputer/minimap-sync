@@ -118,7 +118,7 @@ public class MinimapSync implements ModInitializer {
             server.execute(() -> {
                 if (Model.get(server).teleportRule().canTeleport(player)) {
                     ServerLevel level = dimensionId == null
-                        ? player.getLevel()
+                        ? player.serverLevel()
                         : server.getLevel(ResourceKey.create(Registries.DIMENSION, dimensionId));
                     if (level != null) {
                         try {

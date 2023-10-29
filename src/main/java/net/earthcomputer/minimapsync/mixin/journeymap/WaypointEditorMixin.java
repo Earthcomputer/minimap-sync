@@ -16,6 +16,7 @@ import net.earthcomputer.minimapsync.client.JourneyMapCompat;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.model.Model;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
@@ -129,14 +130,14 @@ public abstract class WaypointEditorMixin extends JmUI {
         }
     }
 
-    @Inject(method = "render", remap = true, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
-    private void redrawWaypoint(PoseStack poseStack, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    @Inject(method = "render", remap = true, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lnet/minecraft/client/gui/GuiGraphics;)V"))
+    private void redrawWaypoint(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
         minimapsync_isRedrawingWaypoint = true;
         try {
-            drawWaypoint(poseStack, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
+            drawWaypoint(guiGraphics.pose(), minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
         } finally {
             minimapsync_isRedrawingWaypoint = false;
         }

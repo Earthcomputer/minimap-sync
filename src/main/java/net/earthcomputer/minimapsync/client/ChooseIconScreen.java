@@ -1,10 +1,10 @@
 package net.earthcomputer.minimapsync.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -110,10 +110,10 @@ public class ChooseIconScreen extends Screen {
     }
 
     @Override
-    public void render(@NotNull PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-        selectionList.render(poseStack, mouseX, mouseY, partialTick);
-        drawCenteredString(poseStack, font, title, width / 2, 8, 0xffffff);
-        super.render(poseStack, mouseX, mouseY, partialTick);
+    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        selectionList.render(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.drawCenteredString(font, title, width / 2, 8, 0xffffff);
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void onDone() {
