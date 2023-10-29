@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(CmdTeleportWaypoint.class)
+@Mixin(value = CmdTeleportWaypoint.class, remap = false)
 public class CmdTeleportWaypointMixin {
     @Shadow
     @Final

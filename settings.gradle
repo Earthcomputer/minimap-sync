@@ -9,4 +9,3 @@ pluginManagement {
 }
 
 include 'main'
-include 'stubs'

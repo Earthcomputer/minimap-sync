@@ -1,6 +1,7 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.vertex.PoseStack;
 import journeymap.client.texture.DynamicTextureImpl;
 import journeymap.client.texture.SimpleTextureImpl;
 import journeymap.client.texture.Texture;
@@ -30,8 +31,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.io.IOException;
 import java.util.Objects;
 
-@Mixin(WaypointEditor.class)
-public class WaypointEditorMixin extends JmUI {
+@Mixin(value = WaypointEditor.class, remap = false)
+public abstract class WaypointEditorMixin extends JmUI {
     @Shadow
     @Final
     @Mutable
@@ -44,7 +45,7 @@ public class WaypointEditorMixin extends JmUI {
     private Waypoint editedWaypoint;
 
     @Shadow
-    protected void drawWaypoint(GuiGraphics guiGraphics, int x, int y) {
+    protected void drawWaypoint(PoseStack poseStack, int x, int y) {
     }
 
     @Unique
@@ -71,7 +72,7 @@ public class WaypointEditorMixin extends JmUI {
         minimapsync_iconName = waypoint == null ? null : waypoint.icon();
     }
 
-    @Inject(method = "init", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;getRenderables()Ljava/util/List;", ordinal = 1))
+    @Inject(method = "init", remap = true, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;getRenderables()Ljava/util/List;", ordinal = 1, remap = false))
     private void addIconButton(CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
@@ -119,7 +120,7 @@ public class WaypointEditorMixin extends JmUI {
     }
 
     @Inject(method = "drawWaypoint", at = @At("HEAD"), cancellable = true)
-    private void onLayoutButtons(GuiGraphics guiGraphics, int x, int y, CallbackInfo ci) {
+    private void onLayoutButtons(PoseStack poseStack, int x, int y, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
@@ -129,14 +130,14 @@ public class WaypointEditorMixin extends JmUI {
         }
     }
 
-    @Inject(method = {"render", "method_25394"}, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
+    @Inject(method = "render", remap = true, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;drawTitle(Lnet/minecraft/client/gui/GuiGraphics;)V"))
     private void redrawWaypoint(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
         minimapsync_isRedrawingWaypoint = true;
         try {
-            drawWaypoint(guiGraphics, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
+            drawWaypoint(guiGraphics.pose(), minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
         } finally {
             minimapsync_isRedrawingWaypoint = false;
         }

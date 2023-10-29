@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Slice;
 
-@Mixin(GuiAddWaypoint.class)
+@Mixin(value = GuiAddWaypoint.class, remap = false)
 public abstract class GuiAddWaypointMixin extends Screen {
     @Shadow
     WaypointManager waypointManager;
@@ -36,6 +36,7 @@ public abstract class GuiAddWaypointMixin extends Screen {
 
     @ModifyArg(
         method = "init",
+        remap = true,
         slice = @Slice(from = @At(value = "CONSTANT", args = "stringValue=minimap.waypoints.sortbyicon", ordinal = 0)),
         at = @At(value = "INVOKE", target = "Lcom/mamiyaotaru/voxelmap/gui/overridden/PopupGuiButton;<init>(IIIILnet/minecraft/network/chat/Component;Lnet/minecraft/client/gui/components/Button$OnPress;Lcom/mamiyaotaru/voxelmap/gui/overridden/IPopupGuiScreen;)V", ordinal = 0))
     private Button.OnPress modifySelectIconAction(Button.OnPress action) {
@@ -62,7 +63,7 @@ public abstract class GuiAddWaypointMixin extends Screen {
         }
     }
 
-    @ModifyVariable(method = {"render", "method_25394"}, at = @At(value = "STORE", ordinal = 0), ordinal = 0)
+    @ModifyVariable(method = "render", remap = true, at = @At(value = "STORE", ordinal = 0), ordinal = 0)
     private TextureAtlas modifyAtlas(TextureAtlas atlas) {
         if (MinimapSyncClient.isCompatibleServer()) {
             return waypointManager.getTextureAtlas();

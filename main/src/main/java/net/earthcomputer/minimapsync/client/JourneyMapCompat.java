@@ -124,6 +124,8 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         try {
             api.remove(waypoint);
             api.show(waypoint);
+        } catch (Exception e) {
+            LOGGER.error("Could not show waypoint", e);
         } finally {
             refreshing = false;
         }
@@ -181,7 +183,11 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             model.waypoints().getWaypoints(null).forEach(waypoint -> {
                 var wpt = toJourneyMap(waypoint);
                 if (wpt != null) {
-                    api.show(wpt);
+                    try {
+                        api.show(wpt);
+                    } catch (Exception e) {
+                        LOGGER.error("Could not show waypoint", e);
+                    }
                 }
             });
         } finally {
@@ -193,7 +199,11 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         var wpt = toJourneyMap(waypoint);
         if (wpt != null) {
-            api.show(wpt);
+            try {
+                api.show(wpt);
+            } catch (Exception e) {
+                LOGGER.error("Could not show waypoint", e);
+            }
         }
     }
 

@@ -9,6 +9,21 @@ loom {
 }
 
 repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    maven {
+        name = "JourneyMap (Public)"
+        url = "https://jm.gserv.me/repository/maven-public/"
+    }
     maven {
         name = 'ParchmentMC'
         url = 'https://maven.parchmentmc.org/'
@@ -20,9 +35,6 @@ repositories {
     maven {
         name = 'DJTheRedstoner'
         url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1/'
-    }
-    flatDir {
-        dirs rootProject.file('libs').absolutePath
     }
 }
 
@@ -41,12 +53,14 @@ dependencies {
     implementation 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
     include 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
 
-    compileOnly project(':stubs')
-
-    for (file in rootProject.file('libs').listFiles()) {
-        if (file.name.endsWith('.jar')) {
-            modImplementation "runtimemod:${file.name.substring(0, file.name.length() - 4)}:1.0"
-        }
+    if (!rootProject.voxelmap_version.isEmpty()) {
+        modImplementation "maven.modrinth:voxelmap-updated:${rootProject.voxelmap_version}"
+    }
+    if (!rootProject.journeymap_version.isEmpty()) {
+        modImplementation "maven.modrinth:journeymap:${rootProject.journeymap_version}"
+    }
+    if (!rootProject.journeymap_api_version.isEmpty()) {
+        modImplementation "info.journeymap:journeymap-api:${rootProject.journeymap_api_version}"
     }
 
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:1.1.0") {
