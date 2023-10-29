@@ -1,7 +1,11 @@
 plugins {
     id 'fabric-loom' version '1.4-SNAPSHOT'
     id 'maven-publish'
+    id 'com.modrinth.minotaur' version '2.+'
 }
+
+group = project.maven_group
+version = "${project.mod_version}+mc${project.minecraft_version}"
 
 loom {
     accessWidenerPath = file('src/main/resources/minimapsync.accesswidener')
@@ -103,6 +107,21 @@ java {
 jar {
     from("LICENSE") {
         rename { "${it}_${project.archivesBaseName}" }
+    }
+}
+
+modrinth {
+    if (System.getenv('MODRINTH_TOKEN') == null && project.hasProperty('modrinthKey')) {
+        token = project.modrinthKey
+    }
+    projectId = 'minimap-sync'
+    uploadFile = remapJar
+    gameVersions = [project.minecraft_version]
+    loaders = ['fabric', 'quilt']
+    dependencies {
+        required.project 'fabric-api'
+        optional.project 'voxelmap-updated'
+        optional.project 'journeymap'
     }
 }
 
