@@ -210,7 +210,7 @@ public class WaypointCommand {
 
     private static int reloadModel(CommandSourceStack source) {
         Model.set(source.getServer(), Model.load(source.getServer()));
-        source.sendSuccess(() -> Component.nullToEmpty("Reloaded minimap model"), true);
+        source.sendSuccess(Component.nullToEmpty("Reloaded minimap model"), true);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -236,7 +236,7 @@ public class WaypointCommand {
             throw DUPLICATE_NAME_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Waypoint added: " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Waypoint added: " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -246,7 +246,7 @@ public class WaypointCommand {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Waypoint deleted: " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Waypoint deleted: " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -256,7 +256,7 @@ public class WaypointCommand {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Waypoint edited: " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Waypoint edited: " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -266,7 +266,7 @@ public class WaypointCommand {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Set waypoint color of " + name + " to " + color), true);
+        source.sendSuccess(Component.nullToEmpty("Set waypoint color of " + name + " to " + color), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -277,7 +277,7 @@ public class WaypointCommand {
         if (waypoints.isEmpty()) {
             throw NO_WAYPOINTS_EXCEPTION.create();
         }
-        source.sendSuccess(() -> MinimapSync.createComponent("""
+        source.sendSuccess(MinimapSync.createComponent("""
             {"text": "=== List of current waypoints ===", "color": "aqua", "bold": "true"}
         """), false);
         Entity entity = source.getEntity();
@@ -291,7 +291,7 @@ public class WaypointCommand {
         }
 
         waypointsByDimension.forEach((dimension, wpts) -> {
-            source.sendSuccess(() -> MinimapSync.createComponent("""
+            source.sendSuccess(MinimapSync.createComponent("""
                 {"text": "in %s", "color": "green"}
             """, dimension.location()), false);
 
@@ -331,7 +331,7 @@ public class WaypointCommand {
                 }
                 String authorStr_f = authorStr;
                 String teleportStr_f = teleportStr;
-                source.sendSuccess(() -> MinimapSync.createComponent("""
+                source.sendSuccess(MinimapSync.createComponent("""
                     [
                         "- ",
                         {"text": "%s", "color": "#%06x", "bold": "true"},
@@ -365,14 +365,14 @@ public class WaypointCommand {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Teleported to waypoint: " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Teleported to waypoint: " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
 
     private static int setTeleportConfig(CommandSourceStack source, WaypointTeleportRule rule) {
         MinimapSync.setTeleportRule(source.getServer(), rule);
-        source.sendSuccess(() -> Component.nullToEmpty("Teleport rule set to: " + rule.name()), true);
+        source.sendSuccess(Component.nullToEmpty("Teleport rule set to: " + rule.name()), true);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -382,11 +382,11 @@ public class WaypointCommand {
             throw NO_ICONS_EXCEPTION.create();
         }
 
-        source.sendSuccess(() -> MinimapSync.createComponent("""
+        source.sendSuccess(MinimapSync.createComponent("""
             {"text": "=== List of %d icons ===", "color": "aqua", "bold": "true"}
         """, model.icons().size()), false);
         for (String icon : model.icons().names()) {
-            source.sendSuccess(() -> MinimapSync.createComponent("""
+            source.sendSuccess(MinimapSync.createComponent("""
                 [
                     "- ",
                     {"text": "%s", "color": "gold"}
@@ -495,7 +495,7 @@ public class WaypointCommand {
         }
 
         MinimapSync.addIcon(source.getServer(), name, baos.toByteArray());
-        source.sendSuccess(() -> Component.nullToEmpty("Added waypoint icon " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Added waypoint icon " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -505,7 +505,7 @@ public class WaypointCommand {
             throw NO_SUCH_ICON_EXCEPTION.create(name);
         }
 
-        source.sendSuccess(() -> Component.nullToEmpty("Deleted waypoint icon " + name), true);
+        source.sendSuccess(Component.nullToEmpty("Deleted waypoint icon " + name), true);
 
         return Command.SINGLE_SUCCESS;
     }
@@ -518,7 +518,7 @@ public class WaypointCommand {
         if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, icon)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
         }
-        source.sendSuccess(() -> Component.nullToEmpty("Set icon of waypoint " + waypoint + " to " + icon), true);
+        source.sendSuccess(Component.nullToEmpty("Set icon of waypoint " + waypoint + " to " + icon), true);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -526,7 +526,7 @@ public class WaypointCommand {
         if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, null)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
         }
-        source.sendSuccess(() -> Component.nullToEmpty("Unset icon of waypoint " + waypoint), true);
+        source.sendSuccess(Component.nullToEmpty("Unset icon of waypoint " + waypoint), true);
         return Command.SINGLE_SUCCESS;
     }
 }
