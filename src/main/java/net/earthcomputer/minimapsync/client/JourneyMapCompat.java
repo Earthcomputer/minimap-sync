@@ -12,6 +12,7 @@ import net.earthcomputer.minimapsync.mixin.journeymap.InternalWaypointAccessor;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
@@ -166,7 +167,8 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             null,
             System.currentTimeMillis(),
-            privateWaypoints.contains(waypoint.getName())
+            privateWaypoints.contains(waypoint.getName()),
+            WaypointVisibilityType.LOCAL
         );
     }
 

@@ -23,7 +23,8 @@ public record Waypoint(
     @Nullable String authorName,
     @Nullable String icon,
     long creationTime,
-    boolean isPrivate
+    boolean isPrivate,
+    WaypointVisibilityType visibilityType
 ) {
     public static final int MIN_ICON_DIMENSIONS = 16;
     public static final int MAX_ICON_DIMENSIONS = 128;
@@ -39,7 +40,8 @@ public record Waypoint(
             FriendlyByteBufUtil.readNullable(buf, buf1 -> buf1.readUtf(16)),
             protocolVersion >= 1 ? FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf) : null,
             protocolVersion >= 2 ? buf.readLong() : System.currentTimeMillis(),
-            protocolVersion >= 3 && buf.readBoolean()
+            protocolVersion >= 3 && buf.readBoolean(),
+            protocolVersion >= 3 ? buf.readEnum(WaypointVisibilityType.class) : WaypointVisibilityType.LOCAL
         );
     }
 
@@ -59,6 +61,7 @@ public record Waypoint(
         }
         if (protocolVersion >= 3) {
             buf.writeBoolean(isPrivate);
+            buf.writeEnum(visibilityType);
         }
     }
 
@@ -71,38 +74,42 @@ public record Waypoint(
     }
 
     public Waypoint withDescription(@Nullable String description) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withDimensions(Set<ResourceKey<Level>> dimensions) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withPos(BlockPos pos) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withColor(int color) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withAuthor(@Nullable UUID author) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withAuthorName(@Nullable String authorName) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withIcon(@Nullable String icon) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withCreationTime(long creationTime) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 
     public Waypoint withPrivate(boolean isPrivate) {
-        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate);
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
+    }
+
+    public Waypoint withVisibilityType(WaypointVisibilityType visibilityType) {
+        return new Waypoint(name, description, color, dimensions, pos, author, authorName, icon, creationTime, isPrivate, visibilityType);
     }
 }

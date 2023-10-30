@@ -8,6 +8,7 @@ import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -97,7 +98,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             undecorateIconNameSuffix(waypoint.imageSuffix),
             System.currentTimeMillis(),
-            privateWaypoints.contains(waypoint.name)
+            privateWaypoints.contains(waypoint.name),
+            WaypointVisibilityType.LOCAL
         );
     }
 

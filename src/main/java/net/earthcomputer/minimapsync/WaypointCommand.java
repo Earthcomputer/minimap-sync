@@ -14,6 +14,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -231,7 +232,8 @@ public class WaypointCommand {
             entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null,
             null,
             System.currentTimeMillis(),
-            false
+            false,
+            WaypointVisibilityType.LOCAL
         );
 
         if (!MinimapSync.addWaypoint(null, source.getServer(), waypoint)) {
