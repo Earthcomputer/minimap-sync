@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -42,6 +43,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     private static final Logger LOGGER = LogManager.getLogger();
     private static JourneyMapCompat INSTANCE;
     private IClientAPI api;
+    private final Set<String> privateWaypoints = new HashSet<>();
 
     private static final ResourceLocation NETHER = new ResourceLocation("the_nether");
     public static final ResourceLocation ICON_NORMAL = new ResourceLocation("journeymap", "ui/img/waypoint-icon.png");
@@ -147,7 +149,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         return null;
     }
 
-    private static Waypoint fromJourneyMap(journeymap.client.api.display.Waypoint waypoint) {
+    private Waypoint fromJourneyMap(journeymap.client.api.display.Waypoint waypoint) {
         BlockPos pos = NETHER.equals(ResourceLocation.tryParse(waypoint.getDimension()))
             ? new BlockPos(waypoint.getPosition().getX() * 8, waypoint.getPosition().getY(), waypoint.getPosition().getZ() * 8)
             : waypoint.getPosition();
@@ -164,13 +166,14 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             null,
             System.currentTimeMillis(),
-            false
+            privateWaypoints.contains(waypoint.getName())
         );
     }
 
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
         initializing = true;
+        privateWaypoints.clear();
         try {
             for (var waypoint : api.getAllWaypoints()) {
                 if (!isDeathPoint(waypoint)) {
@@ -192,6 +195,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                         LOGGER.error("Could not show waypoint", e);
                     }
                 }
+                setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
             });
         } finally {
             initializing = false;
@@ -208,6 +212,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 LOGGER.error("Could not show waypoint", e);
             }
         }
+        setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
     }
 
     @Override
@@ -355,5 +360,13 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         var internalWaypoint = new journeymap.client.waypoint.Waypoint(waypoint);
         ((InternalWaypointAccessor) internalWaypoint).setDisplayId(null);
         WaypointStore.INSTANCE.remove(internalWaypoint, true);
+    }
+
+    public void setWaypointIsPrivate(String name, boolean isPrivate) {
+        if (isPrivate) {
+            privateWaypoints.add(name);
+        } else {
+            privateWaypoints.remove(name);
+        }
     }
 }
