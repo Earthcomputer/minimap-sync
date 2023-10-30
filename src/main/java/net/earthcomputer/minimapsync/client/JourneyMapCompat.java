@@ -161,7 +161,8 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getId(),
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             null,
-            System.currentTimeMillis()
+            System.currentTimeMillis(),
+            false
         );
     }
 

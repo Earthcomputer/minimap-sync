@@ -149,7 +149,7 @@ public abstract class WaypointEditorMixin extends JmUI {
         }
         Model model = Model.get(Minecraft.getInstance().getConnection());
         String name = originalWaypoint.getName();
-        model.waypoints().setIcon(name, minimapsync_iconName);
+        model.waypoints().setIcon(null, name, minimapsync_iconName);
         var waypoint = model.waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
