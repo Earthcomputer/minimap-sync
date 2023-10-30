@@ -6,7 +6,9 @@ import journeymap.client.api.IClientPlugin;
 import journeymap.client.api.event.ClientEvent;
 import journeymap.client.api.event.WaypointEvent;
 import journeymap.client.api.model.MapImage;
+import journeymap.client.waypoint.WaypointStore;
 import net.earthcomputer.minimapsync.MinimapSync;
+import net.earthcomputer.minimapsync.mixin.journeymap.InternalWaypointAccessor;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -122,7 +124,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     private void refresh(journeymap.client.api.display.Waypoint waypoint) {
         refreshing = true;
         try {
-            api.remove(waypoint);
+            remove(waypoint);
             api.show(waypoint);
         } catch (Exception e) {
             LOGGER.error("Could not show waypoint", e);
@@ -172,7 +174,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         try {
             for (var waypoint : api.getAllWaypoints()) {
                 if (!isDeathPoint(waypoint)) {
-                    api.remove(waypoint);
+                    remove(waypoint);
                 }
             }
 
@@ -212,7 +214,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     public void removeWaypoint(ClientPacketListener listener, String name) {
         for (var waypoint : api.getAllWaypoints()) {
             if (name.equals(waypoint.getName())) {
-                api.remove(waypoint);
+                remove(waypoint);
             }
         }
     }
@@ -344,5 +346,14 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 refresh(wpt);
             }
         }
+    }
+
+    private void remove(journeymap.client.api.display.Waypoint waypoint) {
+        api.remove(waypoint);
+
+        // also remove by unqualified id, because journeymap doesn't remove these properly
+        var internalWaypoint = new journeymap.client.waypoint.Waypoint(waypoint);
+        ((InternalWaypointAccessor) internalWaypoint).setDisplayId(null);
+        WaypointStore.INSTANCE.remove(internalWaypoint, true);
     }
 }
