@@ -96,6 +96,12 @@ public record Model(
      * Datafixes the model format
      */
     private static Model updateLoadedModel(MinecraftServer server, Model model) {
+        if (model.formatVersion > 2) {
+            return model;
+        }
+
+        model.waypoints().setAllToLocalVisibility();
+
         if (model.formatVersion > 1) {
             return model;
         }

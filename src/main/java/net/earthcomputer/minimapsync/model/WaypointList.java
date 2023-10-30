@@ -126,4 +126,8 @@ public final class WaypointList {
         long time = System.currentTimeMillis();
         waypoints.replaceAll(waypoint -> waypoint.withCreationTime(time));
     }
+
+    void setAllToLocalVisibility() {
+        waypoints.replaceAll(waypoint -> waypoint.withVisibilityType(WaypointVisibilityType.LOCAL));
+    }
 }
