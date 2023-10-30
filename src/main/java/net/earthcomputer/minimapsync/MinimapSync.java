@@ -16,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -25,7 +26,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.ArrayUtils;
 import org.intellij.lang.annotations.Language;
@@ -60,6 +60,8 @@ public class MinimapSync implements ModInitializer {
     public static final ResourceLocation REMOVE_ICON = new ResourceLocation("minimapsync:remove_icon");
     public static final ResourceLocation SET_ICON = new ResourceLocation("minimapsync:set_icon");
 
+    private static final RateLimiter addWaypointLimiter = new RateLimiter(2000, new TextComponent("You are adding waypoints too quickly"));
+    private static final RateLimiter deleteWaypointLimiter = new RateLimiter(1000, new TextComponent("You are deleting waypoints too quickly"));
 
     @Override
     public void onInitialize() {
@@ -187,6 +189,10 @@ public class MinimapSync implements ModInitializer {
     }
 
     public static boolean addWaypoint(@Nullable ServerPlayer source, MinecraftServer server, Waypoint waypoint) {
+        if (source != null && !addWaypointLimiter.checkRateLimit(source, () -> delWaypoint(null, null, server, waypoint.name()))) {
+            return false;
+        }
+
         Model model = Model.get(server);
         if (!model.waypoints().addWaypoint(waypoint)) {
             if (source != null) {
@@ -216,9 +222,16 @@ public class MinimapSync implements ModInitializer {
 
     public static boolean delWaypoint(@Nullable ServerPlayer source, @Nullable ServerPlayer permissionCheck, MinecraftServer server, String name) {
         Model model = Model.get(server);
-        if (!model.waypoints().removeWaypoint(permissionCheck, name)) {
+        Waypoint existingWaypoint = model.waypoints().getWaypoint(name);
+        if (existingWaypoint == null || !existingWaypoint.isVisibleTo(permissionCheck)) {
             return false;
         }
+
+        if (source != null && !deleteWaypointLimiter.checkRateLimit(source, () -> addWaypoint(null, server, existingWaypoint))) {
+            return false;
+        }
+
+        model.waypoints().removeWaypoint(permissionCheck, name);
         model.save(server);
 
         FriendlyByteBuf buf = PacketByteBufs.create();
