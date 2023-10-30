@@ -190,6 +190,11 @@ public class MinimapSync implements ModInitializer {
 
     public static boolean addWaypoint(@Nullable ServerPlayer source, MinecraftServer server, Waypoint waypoint) {
         if (source != null && !addWaypointLimiter.checkRateLimit(source, () -> delWaypoint(null, null, server, waypoint.name()))) {
+            if (ServerPlayNetworking.canSend(source, REMOVE_WAYPOINT)) {
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                buf.writeUtf(waypoint.name(), 256);
+                ServerPlayNetworking.send(source, REMOVE_WAYPOINT, buf);
+            }
             return false;
         }
 
@@ -228,6 +233,11 @@ public class MinimapSync implements ModInitializer {
         }
 
         if (source != null && !deleteWaypointLimiter.checkRateLimit(source, () -> addWaypoint(null, server, existingWaypoint))) {
+            if (ServerPlayNetworking.canSend(source, ADD_WAYPOINT)) {
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                existingWaypoint.toPacket(getProtocolVersion(source.connection), buf);
+                ServerPlayNetworking.send(source, ADD_WAYPOINT, buf);
+            }
             return false;
         }
 
