@@ -315,6 +315,21 @@ public class WaypointCommand {
                     authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(waypoint.authorName()));
                     authorStr = "," + authorStr;
                 }
+                @Language("JSON") String privateStr;
+                if (!waypoint.isPrivate()) {
+                    privateStr = "";
+                } else {
+                    privateStr = """
+                    [
+                        " ",
+                        {
+                            "text": "[Private]",
+                            "color": "gray"
+                        }
+                    ]
+                    """;
+                    privateStr = "," + privateStr;
+                }
                 @Language("JSON") String teleportStr;
                 if (!canTeleport) {
                     teleportStr = "";
@@ -336,13 +351,14 @@ public class WaypointCommand {
                     teleportStr = "," + teleportStr;
                 }
                 String authorStr_f = authorStr;
+                String privateStr_f = privateStr;
                 String teleportStr_f = teleportStr;
                 source.sendSuccess(MinimapSync.createComponent("""
                     [
                         "- ",
                         {"text": "%s", "color": "#%06x", "bold": "true"},
                         {"text": ": %d %d %d"}
-                        %s%s
+                        %s%s%s
                     ]
                 """,
                     StringEscapeUtils.escapeJson(waypoint.name()),
@@ -351,6 +367,7 @@ public class WaypointCommand {
                     waypoint.pos().getY(),
                     waypoint.pos().getZ(),
                     authorStr_f,
+                    privateStr_f,
                     teleportStr_f
                 ), false);
             }

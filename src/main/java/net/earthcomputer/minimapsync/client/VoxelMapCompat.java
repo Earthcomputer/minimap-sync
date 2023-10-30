@@ -54,6 +54,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     private int tickCounter = 0;
     private final List<Waypoint> serverKnownWaypoints = new ArrayList<>();
     private final Map<String, BufferedImage> icons = new HashMap<>();
+    private final Set<String> privateWaypoints = new HashSet<>();
 
     private static boolean isDeathpoint(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
         return waypoint.imageSuffix.equals("skull");
@@ -83,7 +84,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
         return result;
     }
 
-    public static Waypoint fromVoxel(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
+    public Waypoint fromVoxel(com.mamiyaotaru.voxelmap.util.Waypoint waypoint) {
         return new Waypoint(
             waypoint.name,
             null,
@@ -96,7 +97,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             undecorateIconNameSuffix(waypoint.imageSuffix),
             System.currentTimeMillis(),
-            false
+            privateWaypoints.contains(waypoint.name)
         );
     }
 
@@ -178,6 +179,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
+        privateWaypoints.clear();
         serverKnownWaypoints.clear();
         model.waypoints().getWaypoints(null).forEach(serverKnownWaypoints::add);
 
@@ -188,6 +190,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
             }
         }
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
+            setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
             waypointManager.addWaypoint(toVoxel(waypoint));
         }
 
@@ -240,6 +243,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     @Override
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
         serverKnownWaypoints.add(waypoint);
+        setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
         IWaypointManager waypointManager = AbstractVoxelMap.getInstance().getWaypointManager();
         waypointManager.addWaypoint(toVoxel(waypoint));
         waypointManager.saveWaypoints();
@@ -423,5 +427,13 @@ public enum VoxelMapCompat implements IMinimapCompat {
     @Nullable
     public static String undecorateIconNameSuffix(String name) {
         return name.startsWith(ICON_PREFIX) ? name.substring(ICON_PREFIX.length()) : null;
+    }
+
+    public void setWaypointIsPrivate(String waypoint, boolean isPrivate) {
+        if (isPrivate) {
+            privateWaypoints.add(waypoint);
+        } else {
+            privateWaypoints.remove(waypoint);
+        }
     }
 }

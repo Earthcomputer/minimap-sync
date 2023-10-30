@@ -18,6 +18,7 @@
     "journeymap.WaypointMixin",
     "voxelmap.GuiAddWaypointMixin",
     "voxelmap.GuiPersistentMapMixin",
+    "voxelmap.GuiSlotDimensionsMixin",
     "voxelmap.GuiWaypointsMixin",
     "voxelmap.WaypointManagerMixin"
   ],
