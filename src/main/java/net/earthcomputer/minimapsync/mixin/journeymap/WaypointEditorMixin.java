@@ -145,9 +145,11 @@ public abstract class WaypointEditorMixin extends JmUI {
 
     @Inject(method = "layoutButtons", at = @At("RETURN"))
     private void onLayoutButtons(CallbackInfo ci) {
-        isPrivateCheckbox.setPosition(dimScrollPane.getX(), buttonReset.getY());
-        isPrivateCheckbox.setWidth(dimScrollPane.getWidth());
-        isPrivateCheckbox.setHeight(buttonReset.getHeight());
+        if (isNew) {
+            isPrivateCheckbox.setPosition(dimScrollPane.getX(), buttonReset.getY());
+            isPrivateCheckbox.setWidth(dimScrollPane.getWidth());
+            isPrivateCheckbox.setHeight(buttonReset.getHeight());
+        }
     }
 
     @Inject(method = "drawWaypoint", at = @At("HEAD"), cancellable = true)
