@@ -125,6 +125,7 @@ modrinth {
         required.project 'fabric-api'
         optional.project 'voxelmap-updated'
         optional.project 'journeymap'
+        optional.project 'xaeros-minimap'
     }
 }
 
