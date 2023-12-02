@@ -8,7 +8,10 @@
     "MinecraftServerMixin",
     "ServerGamePacketListenerImplMixin",
     "journeymap.InternalWaypointAccessor",
-    "journeymap.LogFormatterMixin"
+    "journeymap.LogFormatterMixin",
+    "xaerominimap.WaypointReaderMixin",
+    "xaerominimap.WaypointsGuiRendererMixin",
+    "xaerominimap.WaypointsIngameRendererMixin"
   ],
   "client": [
     "ClientPacketListenerMixin",
@@ -21,7 +24,8 @@
     "voxelmap.GuiPersistentMapMixin",
     "voxelmap.GuiSlotDimensionsMixin",
     "voxelmap.GuiWaypointsMixin",
-    "voxelmap.WaypointManagerMixin"
+    "voxelmap.WaypointManagerMixin",
+    "xaerominimap.FMLEventHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

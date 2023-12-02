@@ -10,6 +10,7 @@ import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
@@ -49,9 +50,11 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
     public VoxelMapCompat init() {
         ClientTickEvents.START_WORLD_TICK.register(this::onWorldTick);
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> VoxelMapCompat.INSTANCE.ready = false);
         return this;
     }
 
+    private boolean ready = false;
     private int tickCounter = 0;
     private final List<Waypoint> serverKnownWaypoints = new ArrayList<>();
     private final Map<String, BufferedImage> icons = new HashMap<>();
@@ -177,6 +180,16 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 serverKnownWaypoints.add(fromVoxel(waypoint));
             }
         }
+    }
+
+    public void onReady() {
+        this.ready = true;
+        MinimapSyncClient.checkReady();
+    }
+
+    @Override
+    public boolean isReady() {
+        return ready;
     }
 
     @Override

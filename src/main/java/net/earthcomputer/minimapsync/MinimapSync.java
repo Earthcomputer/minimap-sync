@@ -1,5 +1,6 @@
 package net.earthcomputer.minimapsync;
 
+import com.google.common.hash.Hashing;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
@@ -11,6 +12,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.S2CPlayChannelEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -40,6 +42,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -435,5 +438,23 @@ public class MinimapSync implements ModInitializer {
         }
 
         return true;
+    }
+
+    public static String makeFileSafeString(String original) {
+        //noinspection UnstableApiUsage,deprecation
+        String hash = Hashing.sha1().hashUnencodedChars(original).toString();
+        for (char c : SharedConstants.ILLEGAL_FILE_CHARACTERS) {
+            original = original.replace(c, '_');
+        }
+        original = original.replace('.', '_');
+        return original + "_" + hash;
+    }
+
+    public static String makeResourceSafeString(String original) {
+        //noinspection UnstableApiUsage,deprecation
+        String hash = Hashing.sha1().hashUnencodedChars(original).toString();
+        original = original.toLowerCase(Locale.ROOT);
+        original = Util.sanitizeName(original, ResourceLocation::isAllowedInResourceLocation);
+        return original + "/" + hash;
     }
 }

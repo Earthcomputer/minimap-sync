@@ -173,6 +173,11 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     }
 
     @Override
+    public boolean isReady() {
+        return true;
+    }
+
+    @Override
     public void initModel(ClientPacketListener listener, Model model) {
         initializing = true;
         privateWaypoints.clear();

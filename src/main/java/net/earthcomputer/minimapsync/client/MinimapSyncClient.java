@@ -34,7 +34,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Nullable
     private static IMinimapCompat currentIgnore;
 
-    private static boolean ready = false;
+    private static boolean hasRunReadyTasks = false;
     private static final List<Runnable> whenReady = new ArrayList<>();
 
     // wrap in inner class to lazily compute this value
@@ -48,6 +48,9 @@ public class MinimapSyncClient implements ClientModInitializer {
             if (loader.isModLoaded("journeymap-api-fabric")) {
                 builder.add(JourneyMapCompat.instance());
             }
+            if (loader.isModLoaded("xaerominimap")) {
+                builder.add(XaerosMapCompat.INSTANCE.init());
+            }
             return builder.build();
         });
     }
@@ -55,14 +58,10 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            // VoxelMap is bad and late-initializes itself in the tick loop rather than on the join event.
-            // When VoxelMap is loaded, we hook into VoxelMap to call onReady() instead.
-            if (!FabricLoader.getInstance().isModLoaded("voxelmap")) {
-                MinimapSyncClient.onReady();
-            }
+            checkReady();
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            ready = false;
+            hasRunReadyTasks = false;
             whenReady.clear();
         });
 
@@ -124,17 +123,28 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
     }
 
+    private static boolean isReady() {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
+            if (!compat.isReady()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static void whenReady(Runnable runnable) {
-        if (ready) {
+        if (isReady()) {
             runnable.run();
         } else {
             whenReady.add(runnable);
         }
     }
 
-    public static void onReady() {
-        if (ready) return;
-        ready = true;
+    public static void checkReady() {
+        if (hasRunReadyTasks || !isReady()) {
+            return;
+        }
+        hasRunReadyTasks = true;
 
         for (Runnable runnable : whenReady) {
             runnable.run();
