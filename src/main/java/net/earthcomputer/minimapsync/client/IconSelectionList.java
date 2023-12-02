@@ -1,10 +1,10 @@
 package net.earthcomputer.minimapsync.client;
 
-import com.google.common.hash.Hashing;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Either;
+import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -203,10 +203,9 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
 
         static IconRenderer makeRendererFromImage(String filePath, NativeImage image) {
             DynamicTexture texture = new DynamicTexture(image);
-            @SuppressWarnings("deprecation")
             ResourceLocation textureLocation = new ResourceLocation(
                 "minimapsync",
-                "dynamic_icon_" + Util.sanitizeName(filePath, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(filePath)
+                "dynamic_icon_" + MinimapSync.makeResourceSafeString(filePath)
             );
             Minecraft.getInstance().getTextureManager().register(textureLocation, texture);
             return new TextureIconRenderer(textureLocation) {

@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Set;
 
 public interface IMinimapCompat {
+    boolean isReady();
     void initModel(ClientPacketListener listener, Model model);
     void addWaypoint(ClientPacketListener listener, Waypoint waypoint);
     void removeWaypoint(ClientPacketListener listener, String name);

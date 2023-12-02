@@ -30,7 +30,7 @@ public class WaypointManagerMixin {
     @Inject(method = "newWorld", at = @At("RETURN"))
     private void onNewWorld(Level level, CallbackInfo ci) {
         if (level != null) {
-            MinimapSyncClient.onReady();
+            VoxelMapCompat.INSTANCE.onReady();
         }
     }
 

@@ -34,7 +34,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Nullable
     private static IMinimapCompat currentIgnore;
 
-    private static boolean ready = false;
+    private static boolean hasRunReadyTasks = false;
     private static final List<Runnable> whenReady = new ArrayList<>();
 
     // wrap in inner class to lazily compute this value
@@ -48,6 +48,9 @@ public class MinimapSyncClient implements ClientModInitializer {
             if (loader.isModLoaded("journeymap-api-fabric")) {
                 builder.add(JourneyMapCompat.instance());
             }
+            if (loader.isModLoaded("xaerominimap")) {
+                builder.add(XaerosMapCompat.INSTANCE.init());
+            }
             return builder.build();
         });
     }
@@ -55,14 +58,10 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            // VoxelMap is bad and late-initializes itself in the tick loop rather than on the join event.
-            // When VoxelMap is loaded, we hook into VoxelMap to call onReady() instead.
-            if (!FabricLoader.getInstance().isModLoaded("voxelmap")) {
-                MinimapSyncClient.onReady();
-            }
+            checkReady();
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            ready = false;
+            hasRunReadyTasks = false;
             whenReady.clear();
         });
 
@@ -124,17 +123,28 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
     }
 
+    private static boolean isReady() {
+        for (IMinimapCompat compat : CompatsHolder.COMPATS) {
+            if (!compat.isReady()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static void whenReady(Runnable runnable) {
-        if (ready) {
+        if (isReady()) {
             runnable.run();
         } else {
             whenReady.add(runnable);
         }
     }
 
-    public static void onReady() {
-        if (ready) return;
-        ready = true;
+    public static void checkReady() {
+        if (hasRunReadyTasks || !isReady()) {
+            return;
+        }
+        hasRunReadyTasks = true;
 
         for (Runnable runnable : whenReady) {
             runnable.run();
@@ -163,9 +173,11 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
-    private static void addWaypoint(@Nullable IMinimapCompat source, ClientPacketListener handler, Waypoint waypoint) {
+    private static boolean addWaypoint(@Nullable IMinimapCompat source, ClientPacketListener handler, Waypoint waypoint) {
         Model model = Model.get(handler);
-        model.waypoints().addWaypoint(waypoint);
+        if (!model.waypoints().addWaypoint(waypoint)) {
+            return false;
+        }
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -177,11 +189,12 @@ public class MinimapSyncClient implements ClientModInitializer {
                 }
             }
         }
+        return true;
     }
 
     private static void removeWaypoint(@Nullable IMinimapCompat source, ClientPacketListener handler, String name) {
         Model model = Model.get(handler);
-        model.waypoints().removeWaypoint(name);
+        model.waypoints().removeWaypoint(null, name);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -197,7 +210,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
     private static void setWaypointDimensions(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions) {
         Model model = Model.get(handler);
-        model.waypoints().setWaypointDimensions(name, dimensions);
+        model.waypoints().setWaypointDimensions(null, name, dimensions);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -213,7 +226,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
     private static void setWaypointPos(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, BlockPos pos) {
         Model model = Model.get(handler);
-        model.waypoints().setPos(name, pos);
+        model.waypoints().setPos(null, name, pos);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -229,7 +242,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
     private static void setWaypointColor(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, int color) {
         Model model = Model.get(handler);
-        model.waypoints().setColor(name, color);
+        model.waypoints().setColor(null, name, color);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -245,7 +258,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
     private static void setWaypointDescription(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, String description) {
         Model model = Model.get(handler);
-        model.waypoints().setDescription(name, description);
+        model.waypoints().setDescription(null, name, description);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -306,7 +319,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     }
 
     private static void setWaypointIcon(@Nullable IMinimapCompat source, ClientPacketListener handler, String waypoint, @Nullable String icon) {
-        Model.get(handler).waypoints().setIcon(waypoint, icon);
+        Model.get(handler).waypoints().setIcon(null, waypoint, icon);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
             if (compat != source) {
                 IMinimapCompat prevIgnore = currentIgnore;
@@ -326,7 +339,9 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
 
         ClientPacketListener connection = Minecraft.getInstance().getConnection();
-        addWaypoint(source, connection, waypoint);
+        if (!addWaypoint(source, connection, waypoint)) {
+            return;
+        }
 
         if (ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT)) {
             FriendlyByteBuf buf = PacketByteBufs.create();

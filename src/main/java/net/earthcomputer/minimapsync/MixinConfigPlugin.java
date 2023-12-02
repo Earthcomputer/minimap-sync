@@ -5,6 +5,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -31,8 +32,8 @@ public final class MixinConfigPlugin implements IMixinConfigPlugin {
         if (dotIndex == -1) {
             return true;
         }
-        String modName = mixinClass.substring(0, dotIndex);
-        return FabricLoader.getInstance().isModLoaded(modName);
+        String modId = mixinClass.substring(0, dotIndex);
+        return FabricLoader.getInstance().isModLoaded(modId) || getAliases(modId).stream().anyMatch(FabricLoader.getInstance()::isModLoaded);
     }
 
     @Override
@@ -50,5 +51,13 @@ public final class MixinConfigPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+    }
+
+    private static List<String> getAliases(String modid) {
+        if ("journeymap".equals(modid)) {
+            return List.of("journeymap-fabric");
+        } else {
+            return Collections.emptyList();
+        }
     }
 }

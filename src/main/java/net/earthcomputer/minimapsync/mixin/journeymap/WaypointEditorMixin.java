@@ -6,7 +6,10 @@ import journeymap.client.texture.DynamicTextureImpl;
 import journeymap.client.texture.SimpleTextureImpl;
 import journeymap.client.texture.Texture;
 import journeymap.client.ui.component.Button;
+import journeymap.client.ui.component.CheckBox;
 import journeymap.client.ui.component.JmUI;
+import journeymap.client.ui.component.ScrollPane;
+import journeymap.client.ui.component.TextBox;
 import journeymap.client.ui.waypoint.WaypointEditor;
 import journeymap.client.waypoint.Waypoint;
 import journeymap.client.waypoint.WaypointStore;
@@ -16,6 +19,7 @@ import net.earthcomputer.minimapsync.client.JourneyMapCompat;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.model.Model;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
@@ -25,6 +29,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.io.IOException;
@@ -42,20 +47,30 @@ public abstract class WaypointEditorMixin extends JmUI {
     private Waypoint originalWaypoint;
     @Shadow
     private Waypoint editedWaypoint;
+    @Shadow
+    private Button buttonReset;
+    @Shadow
+    private ScrollPane dimScrollPane;
+    @Shadow @Final
+    private boolean isNew;
+    @Shadow
+    private TextBox fieldName;
 
     @Shadow
     protected void drawWaypoint(PoseStack poseStack, int x, int y) {
     }
 
     @Unique
-    private Button minimapsync_iconButton;
+    private Button iconButton;
     @Unique
     @Nullable
-    private String minimapsync_iconName;
+    private String iconName;
     @Unique
-    private boolean minimapsync_iconNeedsClosing;
+    private boolean iconNeedsClosing;
     @Unique
-    private boolean minimapsync_isRedrawingWaypoint;
+    private boolean isRedrawingWaypoint;
+    @Unique
+    private CheckBox isPrivateCheckbox;
 
     protected WaypointEditorMixin(String title) {
         super(title);
@@ -68,7 +83,7 @@ public abstract class WaypointEditorMixin extends JmUI {
         }
         Model model = Model.get(Minecraft.getInstance().getConnection());
         var waypoint = model.waypoints().getWaypoint(originalWaypoint.getName());
-        minimapsync_iconName = waypoint == null ? null : waypoint.icon();
+        iconName = waypoint == null ? null : waypoint.icon();
     }
 
     @Inject(method = "init", remap = true, at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/waypoint/WaypointEditor;getRenderables()Ljava/util/List;", ordinal = 1, remap = false))
@@ -76,18 +91,18 @@ public abstract class WaypointEditorMixin extends JmUI {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
-        minimapsync_iconButton = addRenderableWidget(
+        iconButton = addRenderableWidget(
             new Button(20, 20, "", button -> minecraft.setScreen(new ChooseIconScreen(
                 this,
-                minimapsync_iconName,
+                iconName,
                 newIcon -> {
-                    if (Objects.equals(newIcon, minimapsync_iconName)) {
+                    if (Objects.equals(newIcon, iconName)) {
                         return;
                     }
-                    minimapsync_iconName = newIcon;
+                    iconName = newIcon;
                     if (newIcon == null) {
                         this.wpTexture = new SimpleTextureImpl(JourneyMapCompat.ICON_NORMAL);
-                        minimapsync_iconNeedsClosing = false;
+                        iconNeedsClosing = false;
                         return;
                     }
                     byte[] bytes = Model.get(Minecraft.getInstance().getConnection()).icons().get(newIcon);
@@ -97,7 +112,7 @@ public abstract class WaypointEditorMixin extends JmUI {
                     try (MemoryStack stack = MemoryStack.stackPush()) {
                         NativeImage image = NativeImage.read(stack.bytes(bytes));
                         this.wpTexture = new DynamicTextureImpl(image);
-                        minimapsync_iconNeedsClosing = true;
+                        iconNeedsClosing = true;
                     } catch (IOException ignore) {
                     }
                 },
@@ -115,7 +130,26 @@ public abstract class WaypointEditorMixin extends JmUI {
                 }
             )))
         );
-        getRenderables().add(minimapsync_iconButton);
+        getRenderables().add(iconButton);
+
+        if (isNew) {
+            isPrivateCheckbox = addRenderableWidget(new CheckBox(I18n.get("minimapsync.private"), isPrivateCheckbox != null && isPrivateCheckbox.getToggled()));
+            getRenderables().add(isPrivateCheckbox);
+        }
+    }
+
+    @ModifyArg(method = "layoutButtons", at = @At(value = "INVOKE", target = "Ljourneymap/client/ui/component/ScrollPane;setDimensions(IIIIII)V", remap = true), index = 1)
+    private int modifyDimScrollPaneHeight(int oldHeight) {
+        return oldHeight - buttonReset.getHeight() - 4;
+    }
+
+    @Inject(method = "layoutButtons", at = @At("RETURN"))
+    private void onLayoutButtons(CallbackInfo ci) {
+        if (isNew) {
+            isPrivateCheckbox.setPosition(dimScrollPane.getX(), buttonReset.getY());
+            isPrivateCheckbox.setWidth(dimScrollPane.getWidth());
+            isPrivateCheckbox.setHeight(buttonReset.getHeight());
+        }
     }
 
     @Inject(method = "drawWaypoint", at = @At("HEAD"), cancellable = true)
@@ -123,8 +157,8 @@ public abstract class WaypointEditorMixin extends JmUI {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
-        if (!minimapsync_isRedrawingWaypoint) {
-            minimapsync_iconButton.setPosition(x - 2, y - 10);
+        if (!isRedrawingWaypoint) {
+            iconButton.setPosition(x - 2, y - 10);
             ci.cancel();
         }
     }
@@ -134,11 +168,11 @@ public abstract class WaypointEditorMixin extends JmUI {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
-        minimapsync_isRedrawingWaypoint = true;
+        isRedrawingWaypoint = true;
         try {
-            drawWaypoint(poseStack, minimapsync_iconButton.getX() + 2, minimapsync_iconButton.getY() + 10);
+            drawWaypoint(poseStack, iconButton.getX() + 2, iconButton.getY() + 10);
         } finally {
-            minimapsync_isRedrawingWaypoint = false;
+            isRedrawingWaypoint = false;
         }
     }
 
@@ -147,9 +181,14 @@ public abstract class WaypointEditorMixin extends JmUI {
         if (!MinimapSyncClient.isCompatibleServer()) {
             return;
         }
+
+        if (isNew) {
+            JourneyMapCompat.instance().setWaypointIsPrivate(fieldName.getValue(), isPrivateCheckbox.getToggled());
+        }
+
         Model model = Model.get(Minecraft.getInstance().getConnection());
         String name = originalWaypoint.getName();
-        model.waypoints().setIcon(name, minimapsync_iconName);
+        model.waypoints().setIcon(null, name, iconName);
         var waypoint = model.waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
@@ -168,7 +207,7 @@ public abstract class WaypointEditorMixin extends JmUI {
 
     @Override
     public void removed() {
-        if (MinimapSyncClient.isCompatibleServer() && minimapsync_iconNeedsClosing) {
+        if (MinimapSyncClient.isCompatibleServer() && iconNeedsClosing) {
             wpTexture.remove();
         }
         super.removed();
