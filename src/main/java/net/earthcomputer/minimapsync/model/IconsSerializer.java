@@ -1,13 +1,12 @@
 package net.earthcomputer.minimapsync.model;
 
-import com.google.common.hash.Hashing;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import net.minecraft.SharedConstants;
+import net.earthcomputer.minimapsync.MinimapSync;
 import net.minecraft.util.GsonHelper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -91,12 +90,6 @@ public record IconsSerializer(Path imageFolder) implements JsonSerializer<Icons>
     }
 
     private Path getImageFile(String iconName) {
-        //noinspection UnstableApiUsage
-        String hash = Hashing.sha1().hashUnencodedChars(iconName).toString();
-        for (char c : SharedConstants.ILLEGAL_FILE_CHARACTERS) {
-            iconName = iconName.replace(c, '_');
-        }
-        iconName = iconName.replace('.', '_');
-        return imageFolder.resolve(iconName + "_" + hash + ".png");
+        return imageFolder.resolve(MinimapSync.makeFileSafeString(iconName) + ".png");
     }
 }

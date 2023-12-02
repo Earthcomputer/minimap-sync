@@ -6,10 +6,13 @@ import journeymap.client.api.IClientPlugin;
 import journeymap.client.api.event.ClientEvent;
 import journeymap.client.api.event.WaypointEvent;
 import journeymap.client.api.model.MapImage;
+import journeymap.client.waypoint.WaypointStore;
 import net.earthcomputer.minimapsync.MinimapSync;
+import net.earthcomputer.minimapsync.mixin.journeymap.InternalWaypointAccessor;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
@@ -31,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -40,6 +44,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     private static final Logger LOGGER = LogManager.getLogger();
     private static JourneyMapCompat INSTANCE;
     private IClientAPI api;
+    private final Set<String> privateWaypoints = new HashSet<>();
 
     private static final ResourceLocation NETHER = new ResourceLocation("the_nether");
     public static final ResourceLocation ICON_NORMAL = new ResourceLocation("journeymap", "ui/img/waypoint-icon.png");
@@ -122,7 +127,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     private void refresh(journeymap.client.api.display.Waypoint waypoint) {
         refreshing = true;
         try {
-            api.remove(waypoint);
+            remove(waypoint);
             api.show(waypoint);
         } catch (Exception e) {
             LOGGER.error("Could not show waypoint", e);
@@ -145,7 +150,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         return null;
     }
 
-    private static Waypoint fromJourneyMap(journeymap.client.api.display.Waypoint waypoint) {
+    private Waypoint fromJourneyMap(journeymap.client.api.display.Waypoint waypoint) {
         BlockPos pos = NETHER.equals(ResourceLocation.tryParse(waypoint.getDimension()))
             ? new BlockPos(waypoint.getPosition().getX() * 8, waypoint.getPosition().getY(), waypoint.getPosition().getZ() * 8)
             : waypoint.getPosition();
@@ -161,17 +166,25 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             Minecraft.getInstance().getUser().getGameProfile().getId(),
             Minecraft.getInstance().getUser().getGameProfile().getName(),
             null,
-            System.currentTimeMillis()
+            System.currentTimeMillis(),
+            privateWaypoints.contains(waypoint.getName()),
+            WaypointVisibilityType.LOCAL
         );
+    }
+
+    @Override
+    public boolean isReady() {
+        return true;
     }
 
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
         initializing = true;
+        privateWaypoints.clear();
         try {
             for (var waypoint : api.getAllWaypoints()) {
                 if (!isDeathPoint(waypoint)) {
-                    api.remove(waypoint);
+                    remove(waypoint);
                 }
             }
 
@@ -189,6 +202,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                         LOGGER.error("Could not show waypoint", e);
                     }
                 }
+                setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
             });
         } finally {
             initializing = false;
@@ -205,13 +219,14 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 LOGGER.error("Could not show waypoint", e);
             }
         }
+        setWaypointIsPrivate(waypoint.name(), waypoint.isPrivate());
     }
 
     @Override
     public void removeWaypoint(ClientPacketListener listener, String name) {
         for (var waypoint : api.getAllWaypoints()) {
             if (name.equals(waypoint.getName())) {
-                api.remove(waypoint);
+                remove(waypoint);
             }
         }
     }
@@ -342,6 +357,23 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 wpt.setIcon(image == null ? null : new MapImage(image, 0, 0, ICON_SIZE, ICON_SIZE, Objects.requireNonNullElse(wpt.getColor(), 0xffffff), 1));
                 refresh(wpt);
             }
+        }
+    }
+
+    private void remove(journeymap.client.api.display.Waypoint waypoint) {
+        api.remove(waypoint);
+
+        // also remove by unqualified id, because journeymap doesn't remove these properly
+        var internalWaypoint = new journeymap.client.waypoint.Waypoint(waypoint);
+        ((InternalWaypointAccessor) internalWaypoint).setDisplayId(null);
+        WaypointStore.INSTANCE.remove(internalWaypoint, true);
+    }
+
+    public void setWaypointIsPrivate(String name, boolean isPrivate) {
+        if (isPrivate) {
+            privateWaypoints.add(name);
+        } else {
+            privateWaypoints.remove(name);
         }
     }
 }

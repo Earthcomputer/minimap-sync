@@ -1,5 +1,6 @@
 package net.earthcomputer.minimapsync;
 
+import com.google.common.hash.Hashing;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
@@ -11,6 +12,8 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.S2CPlayChannelEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.SharedConstants;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
@@ -24,7 +27,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.ArrayUtils;
 import org.intellij.lang.annotations.Language;
@@ -39,12 +41,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MinimapSync implements ModInitializer {
-    public static final int CURRENT_PROTOCOL_VERSION = 2;
+    public static final int CURRENT_PROTOCOL_VERSION = 3;
     public static final ResourceLocation PROTOCOL_VERSION = new ResourceLocation("minimapsync:protocol_version");
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
     public static final ResourceLocation ADD_WAYPOINT = new ResourceLocation("minimapsync:add_waypoint");
@@ -59,6 +62,8 @@ public class MinimapSync implements ModInitializer {
     public static final ResourceLocation REMOVE_ICON = new ResourceLocation("minimapsync:remove_icon");
     public static final ResourceLocation SET_ICON = new ResourceLocation("minimapsync:set_icon");
 
+    private static final RateLimiter addWaypointLimiter = new RateLimiter(2000, Component.literal("You are adding waypoints too quickly"));
+    private static final RateLimiter deleteWaypointLimiter = new RateLimiter(1000, Component.literal("You are deleting waypoints too quickly"));
 
     @Override
     public void onInitialize() {
@@ -73,7 +78,7 @@ public class MinimapSync implements ModInitializer {
             } else if (channels.contains(INIT_MODEL)) {
                 server.execute(() -> {
                     FriendlyByteBuf buf = PacketByteBufs.create();
-                    Model.get(server).toPacket(0, buf);
+                    Model.get(server).toPacket(handler.player.getUUID(), 0, buf);
                     sender.sendPacket(INIT_MODEL, buf);
                 });
             }
@@ -84,7 +89,7 @@ public class MinimapSync implements ModInitializer {
             if (ServerPlayNetworking.canSend(handler, INIT_MODEL)) {
                 server.execute(() -> {
                     FriendlyByteBuf buf2 = PacketByteBufs.create();
-                    Model.get(server).toPacket(getProtocolVersion(handler), buf2);
+                    Model.get(server).toPacket(player.getUUID(), getProtocolVersion(handler), buf2);
                     responseSender.sendPacket(INIT_MODEL, buf2);
                 });
             }
@@ -95,22 +100,22 @@ public class MinimapSync implements ModInitializer {
         });
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_WAYPOINT, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
-            server.execute(() -> delWaypoint(player, server, name));
+            server.execute(() -> delWaypoint(player, player, server, name));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_DIMENSIONS, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registry.DIMENSION_REGISTRY));
-            server.execute(() -> setWaypointDimensions(player, server, name, dimensions));
+            server.execute(() -> setWaypointDimensions(player, player, server, name, dimensions));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_POS, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             BlockPos pos = buf.readBlockPos();
-            server.execute(() -> setWaypointPos(player, server, name, pos));
+            server.execute(() -> setWaypointPos(player, player, server, name, pos));
         });
         ServerPlayNetworking.registerGlobalReceiver(SET_WAYPOINT_COLOR, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
             int color = buf.readInt();
-            server.execute(() -> setWaypointColor(player, server, name, color));
+            server.execute(() -> setWaypointColor(player, player, server, name, color));
         });
         ServerPlayNetworking.registerGlobalReceiver(TELEPORT, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
@@ -168,7 +173,7 @@ public class MinimapSync implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(SET_ICON, (server, player, handler, buf, responseSender) -> {
             String waypoint = buf.readUtf(256);
             String icon = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
-            server.execute(() -> setWaypointIcon(server, waypoint, icon));
+            server.execute(() -> setWaypointIcon(server, player, waypoint, icon));
         });
     }
 
@@ -186,14 +191,33 @@ public class MinimapSync implements ModInitializer {
     }
 
     public static boolean addWaypoint(@Nullable ServerPlayer source, MinecraftServer server, Waypoint waypoint) {
+        if (source != null && !addWaypointLimiter.checkRateLimit(source, () -> delWaypoint(null, null, server, waypoint.name()))) {
+            if (ServerPlayNetworking.canSend(source, REMOVE_WAYPOINT)) {
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                buf.writeUtf(waypoint.name(), 256);
+                ServerPlayNetworking.send(source, REMOVE_WAYPOINT, buf);
+            }
+            return false;
+        }
+
         Model model = Model.get(server);
         if (!model.waypoints().addWaypoint(waypoint)) {
+            if (source != null) {
+                source.sendSystemMessage(createComponent("""
+                    {"text": "Waypoint already exists", "color": "red"}
+                """));
+                if (ServerPlayNetworking.canSend(source, REMOVE_WAYPOINT)) {
+                    FriendlyByteBuf buf = PacketByteBufs.create();
+                    buf.writeUtf(waypoint.name(), 256);
+                    ServerPlayNetworking.send(source, REMOVE_WAYPOINT, buf);
+                }
+            }
             return false;
         }
         model.save(server);
 
         for (ServerPlayer player : PlayerLookup.all(server)) {
-            if (player != source && ServerPlayNetworking.canSend(player, ADD_WAYPOINT)) {
+            if (player != source && ServerPlayNetworking.canSend(player, ADD_WAYPOINT) && waypoint.isVisibleTo(player)) {
                 FriendlyByteBuf buf = PacketByteBufs.create();
                 waypoint.toPacket(getProtocolVersion(player.connection), buf);
                 ServerPlayNetworking.send(player, ADD_WAYPOINT, buf);
@@ -203,11 +227,23 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    public static boolean delWaypoint(@Nullable ServerPlayer source, MinecraftServer server, String name) {
+    public static boolean delWaypoint(@Nullable ServerPlayer source, @Nullable ServerPlayer permissionCheck, MinecraftServer server, String name) {
         Model model = Model.get(server);
-        if (!model.waypoints().removeWaypoint(name)) {
+        Waypoint existingWaypoint = model.waypoints().getWaypoint(name);
+        if (existingWaypoint == null || !existingWaypoint.isVisibleTo(permissionCheck)) {
             return false;
         }
+
+        if (source != null && !deleteWaypointLimiter.checkRateLimit(source, () -> addWaypoint(null, server, existingWaypoint))) {
+            if (ServerPlayNetworking.canSend(source, ADD_WAYPOINT)) {
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                existingWaypoint.toPacket(getProtocolVersion(source.connection), buf);
+                ServerPlayNetworking.send(source, ADD_WAYPOINT, buf);
+            }
+            return false;
+        }
+
+        model.waypoints().removeWaypoint(permissionCheck, name);
         model.save(server);
 
         FriendlyByteBuf buf = PacketByteBufs.create();
@@ -222,9 +258,9 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    private boolean setWaypointDimensions(@Nullable ServerPlayer source, MinecraftServer server, String name, Set<ResourceKey<Level>> dimensions) {
+    private boolean setWaypointDimensions(@Nullable ServerPlayer source, @Nullable ServerPlayer permissionCheck, MinecraftServer server, String name, Set<ResourceKey<Level>> dimensions) {
         Model model = Model.get(server);
-        if (!model.waypoints().setWaypointDimensions(name, dimensions)) {
+        if (!model.waypoints().setWaypointDimensions(permissionCheck, name, dimensions)) {
             return false;
         }
         model.save(server);
@@ -242,9 +278,9 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    public static boolean setWaypointPos(@Nullable ServerPlayer source, MinecraftServer server, String name, BlockPos pos) {
+    public static boolean setWaypointPos(@Nullable ServerPlayer source, @Nullable ServerPlayer permissionCheck, MinecraftServer server, String name, BlockPos pos) {
         Model model = Model.get(server);
-        if (!model.waypoints().setPos(name, pos)) {
+        if (!model.waypoints().setPos(permissionCheck, name, pos)) {
             return false;
         }
         model.save(server);
@@ -262,9 +298,9 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    public static boolean setWaypointColor(@Nullable ServerPlayer source, MinecraftServer server, String name, int color) {
+    public static boolean setWaypointColor(@Nullable ServerPlayer source, @Nullable ServerPlayer permissionCheck, MinecraftServer server, String name, int color) {
         Model model = Model.get(server);
-        if (!model.waypoints().setColor(name, color)) {
+        if (!model.waypoints().setColor(permissionCheck, name, color)) {
             return false;
         }
         model.save(server);
@@ -282,9 +318,9 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    public static boolean setDescription(MinecraftServer server, String name, @Nullable String description) {
+    public static boolean setDescription(MinecraftServer server, @Nullable ServerPlayer permissionCheck, String name, @Nullable String description) {
         Model model = Model.get(server);
-        if (!model.waypoints().setDescription(name, description)) {
+        if (!model.waypoints().setDescription(permissionCheck, name, description)) {
             return false;
         }
         model.save(server);
@@ -316,24 +352,27 @@ public class MinimapSync implements ModInitializer {
         }
     }
 
-    public static boolean teleportToWaypoint(MinecraftServer server, Entity entity, String name, ServerLevel dimension) throws CommandSyntaxException {
+    public static boolean teleportToWaypoint(MinecraftServer server, ServerPlayer player, String name, ServerLevel dimension) throws CommandSyntaxException {
         Waypoint waypoint = Model.get(server).waypoints().getWaypoint(name);
         if (waypoint == null) {
+            return false;
+        }
+        if (!waypoint.isVisibleTo(player)) {
             return false;
         }
 
         double scale = 1 / dimension.dimensionType().coordinateScale();
 
         TeleportCommand.performTeleport(
-            entity.createCommandSourceStack(),
-            entity,
+            player.createCommandSourceStack(),
+            player,
             dimension,
             waypoint.pos().getX() * scale + 0.5,
             waypoint.pos().getY(),
             waypoint.pos().getZ() * scale + 0.5,
             Collections.emptySet(),
-            entity.getYRot(),
-            entity.getXRot(),
+            player.getYRot(),
+            player.getXRot(),
             null
         );
 
@@ -380,9 +419,9 @@ public class MinimapSync implements ModInitializer {
         return true;
     }
 
-    public static boolean setWaypointIcon(MinecraftServer server, String waypoint, @Nullable String icon) {
+    public static boolean setWaypointIcon(MinecraftServer server, @Nullable ServerPlayer permissionCheck, String waypoint, @Nullable String icon) {
         Model model = Model.get(server);
-        if (!model.waypoints().setIcon(waypoint, icon)) {
+        if (!model.waypoints().setIcon(permissionCheck, waypoint, icon)) {
             return false;
         }
         model.save(server);
@@ -398,5 +437,23 @@ public class MinimapSync implements ModInitializer {
         }
 
         return true;
+    }
+
+    public static String makeFileSafeString(String original) {
+        //noinspection UnstableApiUsage,deprecation
+        String hash = Hashing.sha1().hashUnencodedChars(original).toString();
+        for (char c : SharedConstants.ILLEGAL_FILE_CHARACTERS) {
+            original = original.replace(c, '_');
+        }
+        original = original.replace('.', '_');
+        return original + "_" + hash;
+    }
+
+    public static String makeResourceSafeString(String original) {
+        //noinspection UnstableApiUsage,deprecation
+        String hash = Hashing.sha1().hashUnencodedChars(original).toString();
+        original = original.toLowerCase(Locale.ROOT);
+        original = Util.sanitizeName(original, ResourceLocation::isAllowedInResourceLocation);
+        return original + "/" + hash;
     }
 }

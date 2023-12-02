@@ -25,6 +25,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 public record Model(
     int formatVersion,
@@ -64,8 +65,8 @@ public record Model(
         );
     }
 
-    public void toPacket(int protocolVersion, FriendlyByteBuf buf) {
-        waypoints.toPacket(protocolVersion, buf);
+    public void toPacket(UUID player, int protocolVersion, FriendlyByteBuf buf) {
+        waypoints.toPacket(player, protocolVersion, buf);
         buf.writeEnum(teleportRule);
         if (protocolVersion >= 1) {
             icons.toPacket(buf);
@@ -95,6 +96,12 @@ public record Model(
      * Datafixes the model format
      */
     private static Model updateLoadedModel(MinecraftServer server, Model model) {
+        if (model.formatVersion > 2) {
+            return model;
+        }
+
+        model.waypoints().setAllToLocalVisibility();
+
         if (model.formatVersion > 1) {
             return model;
         }

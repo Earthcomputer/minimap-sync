@@ -2,12 +2,16 @@
   "required": true,
   "minVersion": "0.8",
   "package": "net.earthcomputer.minimapsync.mixin",
-  "compatibilityLevel": "JAVA_16",
+  "compatibilityLevel": "JAVA_17",
   "plugin": "net.earthcomputer.minimapsync.MixinConfigPlugin",
   "mixins": [
     "MinecraftServerMixin",
     "ServerGamePacketListenerImplMixin",
-    "journeymap.LogFormatterMixin"
+    "journeymap.InternalWaypointAccessor",
+    "journeymap.LogFormatterMixin",
+    "xaerominimap.WaypointReaderMixin",
+    "xaerominimap.WaypointsGuiRendererMixin",
+    "xaerominimap.WaypointsIngameRendererMixin"
   ],
   "client": [
     "ClientPacketListenerMixin",
@@ -18,8 +22,10 @@
     "journeymap.WaypointMixin",
     "voxelmap.GuiAddWaypointMixin",
     "voxelmap.GuiPersistentMapMixin",
+    "voxelmap.GuiSlotDimensionsMixin",
     "voxelmap.GuiWaypointsMixin",
-    "voxelmap.WaypointManagerMixin"
+    "voxelmap.WaypointManagerMixin",
+    "xaerominimap.FMLEventHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
