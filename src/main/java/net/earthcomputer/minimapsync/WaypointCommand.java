@@ -14,6 +14,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -83,8 +84,9 @@ public class WaypointCommand {
 
     private static final SuggestionProvider<CommandSourceStack> WAYPOINT_NAME_SUGGESTOR = (context, builder) -> {
         Model model = Model.get(context.getSource().getServer());
+        ServerPlayer player = context.getSource().getEntity() instanceof ServerPlayer p ? p : null;
         return suggestMatching(
-            model.waypoints().getWaypoints(null).map(Waypoint::name),
+            model.waypoints().getWaypoints(null).filter(wpt -> wpt.isVisibleTo(player)).map(Waypoint::name),
             builder
         );
     };
@@ -229,7 +231,9 @@ public class WaypointCommand {
             uuid,
             entity instanceof ServerPlayer player ? player.getGameProfile().getName() : null,
             null,
-            System.currentTimeMillis()
+            System.currentTimeMillis(),
+            false,
+            WaypointVisibilityType.LOCAL
         );
 
         if (!MinimapSync.addWaypoint(null, source.getServer(), waypoint)) {
@@ -242,7 +246,7 @@ public class WaypointCommand {
     }
 
     private static int delWaypoint(CommandSourceStack source, String name) throws CommandSyntaxException {
-        if (!MinimapSync.delWaypoint(null, source.getServer(), name)) {
+        if (!MinimapSync.delWaypoint(null, source.getEntity() instanceof ServerPlayer p ? p : null, source.getServer(), name)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
@@ -252,7 +256,7 @@ public class WaypointCommand {
     }
 
     private static int editWaypoint(CommandSourceStack source, String name, String description) throws CommandSyntaxException {
-        if (!MinimapSync.setDescription(source.getServer(), name, description)) {
+        if (!MinimapSync.setDescription(source.getServer(), source.getEntity() instanceof ServerPlayer p ? p : null, name, description)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
@@ -262,7 +266,7 @@ public class WaypointCommand {
     }
 
     private static int setWaypointColor(CommandSourceStack source, String name, int color) throws CommandSyntaxException {
-        if (!MinimapSync.setWaypointColor(null, source.getServer(), name, color)) {
+        if (!MinimapSync.setWaypointColor(null, source.getEntity() instanceof ServerPlayer p ? p : null, source.getServer(), name, color)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
@@ -272,16 +276,20 @@ public class WaypointCommand {
     }
 
     private static int listWaypoints(CommandSourceStack source, @Nullable UUID author) throws CommandSyntaxException {
+        Entity entity = source.getEntity();
+        ServerPlayer player = entity instanceof ServerPlayer p ? p : null;
+
         Model model = Model.get(source.getServer());
-        List<Waypoint> waypoints = model.waypoints().getWaypoints(author).toList();
+        List<Waypoint> waypoints = model.waypoints().getWaypoints(author)
+            .filter(wpt -> player == null || !wpt.isPrivate() || player.getUUID().equals(wpt.author()))
+            .toList();
         if (waypoints.isEmpty()) {
             throw NO_WAYPOINTS_EXCEPTION.create();
         }
         source.sendSuccess(() -> MinimapSync.createComponent("""
             {"text": "=== List of current waypoints ===", "color": "aqua", "bold": "true"}
         """), false);
-        Entity entity = source.getEntity();
-        boolean canTeleport = entity instanceof ServerPlayer player && model.teleportRule().canTeleport(player);
+        boolean canTeleport = player != null && model.teleportRule().canTeleport(player);
 
         Map<ResourceKey<Level>, List<Waypoint>> waypointsByDimension = new HashMap<>();
         for (Waypoint waypoint : waypoints) {
@@ -309,6 +317,21 @@ public class WaypointCommand {
                     authorStr = authorStr.formatted(StringEscapeUtils.escapeJson(waypoint.authorName()));
                     authorStr = "," + authorStr;
                 }
+                @Language("JSON") String privateStr;
+                if (!waypoint.isPrivate()) {
+                    privateStr = "";
+                } else {
+                    privateStr = """
+                    [
+                        " ",
+                        {
+                            "text": "[Private]",
+                            "color": "gray"
+                        }
+                    ]
+                    """;
+                    privateStr = "," + privateStr;
+                }
                 @Language("JSON") String teleportStr;
                 if (!canTeleport) {
                     teleportStr = "";
@@ -330,13 +353,14 @@ public class WaypointCommand {
                     teleportStr = "," + teleportStr;
                 }
                 String authorStr_f = authorStr;
+                String privateStr_f = privateStr;
                 String teleportStr_f = teleportStr;
                 source.sendSuccess(() -> MinimapSync.createComponent("""
                     [
                         "- ",
                         {"text": "%s", "color": "#%06x", "bold": "true"},
                         {"text": ": %d %d %d"}
-                        %s%s
+                        %s%s%s
                     ]
                 """,
                     StringEscapeUtils.escapeJson(waypoint.name()),
@@ -345,6 +369,7 @@ public class WaypointCommand {
                     waypoint.pos().getY(),
                     waypoint.pos().getZ(),
                     authorStr_f,
+                    privateStr_f,
                     teleportStr_f
                 ), false);
             }
@@ -361,7 +386,7 @@ public class WaypointCommand {
             throw CANNOT_TELEPORT_EXCEPTION.create();
         }
 
-        if (!MinimapSync.teleportToWaypoint(server, entity, name, dimension)) {
+        if (!MinimapSync.teleportToWaypoint(server, player, name, dimension)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(name);
         }
 
@@ -515,7 +540,7 @@ public class WaypointCommand {
         if (!model.icons().names().contains(icon)) {
             throw NO_SUCH_ICON_EXCEPTION.create(icon);
         }
-        if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, icon)) {
+        if (!MinimapSync.setWaypointIcon(source.getServer(), source.getEntity() instanceof ServerPlayer p ? p : null, waypoint, icon)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
         }
         source.sendSuccess(() -> Component.nullToEmpty("Set icon of waypoint " + waypoint + " to " + icon), true);
@@ -523,7 +548,7 @@ public class WaypointCommand {
     }
 
     private static int unsetWaypointIcon(CommandSourceStack source, String waypoint) throws CommandSyntaxException {
-        if (!MinimapSync.setWaypointIcon(source.getServer(), waypoint, null)) {
+        if (!MinimapSync.setWaypointIcon(source.getServer(), source.getEntity() instanceof ServerPlayer p ? p : null, waypoint, null)) {
             throw NO_SUCH_WAYPOINT_EXCEPTION.create(waypoint);
         }
         source.sendSuccess(() -> Component.nullToEmpty("Unset icon of waypoint " + waypoint), true);

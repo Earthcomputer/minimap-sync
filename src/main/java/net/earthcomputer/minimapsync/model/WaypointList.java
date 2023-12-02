@@ -4,6 +4,7 @@ import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,8 +25,8 @@ public final class WaypointList {
         waypoints = FriendlyByteBufUtil.readList(buf, buf1 -> new Waypoint(protocolVersion, buf1));
     }
 
-    public void toPacket(int protocolVersion, FriendlyByteBuf buf) {
-        FriendlyByteBufUtil.writeCollection(buf, waypoints, (buf2, waypoint) -> waypoint.toPacket(protocolVersion, buf2));
+    public void toPacket(UUID player, int protocolVersion, FriendlyByteBuf buf) {
+        FriendlyByteBufUtil.writeCollection(buf, waypoints.stream().filter(wpt -> wpt.isVisibleTo(player)).toList(), (buf2, waypoint) -> waypoint.toPacket(protocolVersion, buf2));
     }
 
     @Nullable
@@ -48,9 +49,9 @@ public final class WaypointList {
         return true;
     }
 
-    public boolean removeWaypoint(String name) {
+    public boolean removeWaypoint(@Nullable ServerPlayer permissionCheck, String name) {
         for (Waypoint waypoint : waypoints) {
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.remove(waypoint);
                 return true;
             }
@@ -58,10 +59,10 @@ public final class WaypointList {
         return false;
     }
 
-    public boolean setWaypointDimensions(String name, Set<ResourceKey<Level>> dimensions) {
+    public boolean setWaypointDimensions(@Nullable ServerPlayer permissionCheck, String name, Set<ResourceKey<Level>> dimensions) {
         for (int i = 0; i < waypoints.size(); i++) {
             Waypoint waypoint = waypoints.get(i);
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.set(i, waypoint.withDimensions(dimensions));
                 return true;
             }
@@ -69,10 +70,10 @@ public final class WaypointList {
         return false;
     }
 
-    public boolean setPos(String name, BlockPos pos) {
+    public boolean setPos(@Nullable ServerPlayer permissionCheck, String name, BlockPos pos) {
         for (int i = 0; i < waypoints.size(); i++) {
             Waypoint waypoint = waypoints.get(i);
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.set(i, waypoint.withPos(pos));
                 return true;
             }
@@ -80,10 +81,10 @@ public final class WaypointList {
         return false;
     }
 
-    public boolean setColor(String name, int color) {
+    public boolean setColor(@Nullable ServerPlayer permissionCheck, String name, int color) {
         for (int i = 0; i < waypoints.size(); i++) {
             Waypoint waypoint = waypoints.get(i);
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.set(i, waypoint.withColor(color));
                 return true;
             }
@@ -91,10 +92,10 @@ public final class WaypointList {
         return false;
     }
 
-    public boolean setDescription(String name, @Nullable String description) {
+    public boolean setDescription(@Nullable ServerPlayer permissionCheck, String name, @Nullable String description) {
         for (int i = 0; i < waypoints.size(); i++) {
             Waypoint waypoint = waypoints.get(i);
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.set(i, waypoint.withDescription(description));
                 return true;
             }
@@ -102,10 +103,10 @@ public final class WaypointList {
         return false;
     }
 
-    public boolean setIcon(String name, @Nullable String icon) {
+    public boolean setIcon(@Nullable ServerPlayer permissionCheck, String name, @Nullable String icon) {
         for (int i = 0; i < waypoints.size(); i++) {
             Waypoint waypoint = waypoints.get(i);
-            if (waypoint.name().equals(name)) {
+            if (waypoint.name().equals(name) && waypoint.isVisibleTo(permissionCheck)) {
                 waypoints.set(i, waypoint.withIcon(icon));
                 return true;
             }
@@ -124,5 +125,9 @@ public final class WaypointList {
     void setAllToCurrentTime() {
         long time = System.currentTimeMillis();
         waypoints.replaceAll(waypoint -> waypoint.withCreationTime(time));
+    }
+
+    void setAllToLocalVisibility() {
+        waypoints.replaceAll(waypoint -> waypoint.withVisibilityType(WaypointVisibilityType.LOCAL));
     }
 }
