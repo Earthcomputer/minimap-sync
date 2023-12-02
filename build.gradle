@@ -69,8 +69,6 @@ dependencies {
         modImplementation "maven.modrinth:xaeros-minimap:${project.xaeros_version}"
     }
 
-    include(implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:${project.mixinextras_version}")))
-
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:1.1.0") {
         exclude group: 'net.fabricmc', module: 'fabric-loader'
     }
