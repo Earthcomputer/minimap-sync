@@ -163,8 +163,8 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
                 return location == null ? null : ResourceKey.create(Registries.DIMENSION, location);
             }).filter(Objects::nonNull).collect(Collectors.toSet()),
             pos,
-            Minecraft.getInstance().getUser().getGameProfile().getId(),
-            Minecraft.getInstance().getUser().getGameProfile().getName(),
+            Minecraft.getInstance().getUser().getProfileId(),
+            Minecraft.getInstance().getUser().getName(),
             null,
             System.currentTimeMillis(),
             privateWaypoints.contains(waypoint.getName()),

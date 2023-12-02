@@ -29,14 +29,6 @@
   "depends": {
     "fabricloader": ">=0.15.0",
     "fabric": "*",
-    "minecraft": ">=1.20"
-  },
-  "custom": {
-    "multiconnect": {
-      "custom_payloads": {
-        "allowed_clientbound": "minimapsync:*",
-        "allowed_serverbound": "minimapsync:*"
-      }
-    }
+    "minecraft": "1.20.2"
   }
 }

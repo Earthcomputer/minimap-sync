@@ -97,8 +97,8 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 .map(dim -> ResourceKey.create(Registries.DIMENSION, dim.resourceLocation))
                 .collect(Collectors.toCollection(LinkedHashSet::new)),
             new BlockPos(waypoint.x, waypoint.y, waypoint.z),
-            Minecraft.getInstance().getUser().getGameProfile().getId(),
-            Minecraft.getInstance().getUser().getGameProfile().getName(),
+            Minecraft.getInstance().getUser().getProfileId(),
+            Minecraft.getInstance().getUser().getName(),
             undecorateIconNameSuffix(waypoint.imageSuffix),
             System.currentTimeMillis(),
             privateWaypoints.contains(waypoint.name),
