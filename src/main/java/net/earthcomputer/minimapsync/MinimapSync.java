@@ -454,7 +454,7 @@ public class MinimapSync implements ModInitializer {
         //noinspection UnstableApiUsage,deprecation
         String hash = Hashing.sha1().hashUnencodedChars(original).toString();
         original = original.toLowerCase(Locale.ROOT);
-        original = Util.sanitizeName(original, ResourceLocation::isAllowedInResourceLocation);
+        original = Util.sanitizeName(original, ResourceLocation::validPathChar);
         return original + "/" + hash;
     }
 }
