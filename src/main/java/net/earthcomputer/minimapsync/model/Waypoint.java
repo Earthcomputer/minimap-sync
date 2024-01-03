@@ -10,6 +10,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -28,6 +29,12 @@ public record Waypoint(
 ) {
     public static final int MIN_ICON_DIMENSIONS = 16;
     public static final int MAX_ICON_DIMENSIONS = 128;
+
+    public Waypoint {
+        if (icon != null) {
+            icon = icon.toLowerCase(Locale.ROOT);
+        }
+    }
 
     public Waypoint(int protocolVersion, FriendlyByteBuf buf) {
         this(
