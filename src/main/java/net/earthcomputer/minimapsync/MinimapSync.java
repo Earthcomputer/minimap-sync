@@ -2,7 +2,7 @@ package net.earthcomputer.minimapsync;
 
 import com.google.common.hash.Hashing;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
+import net.earthcomputer.minimapsync.ducks.INetworkAddon;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -48,7 +48,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MinimapSync implements ModInitializer {
-    public static final int CURRENT_PROTOCOL_VERSION = 3;
+    public static final int CURRENT_PROTOCOL_VERSION = 4;
     public static final ResourceLocation PROTOCOL_VERSION = new ResourceLocation("minimapsync:protocol_version");
     public static final ResourceLocation INIT_MODEL = new ResourceLocation("minimapsync:init_model");
     public static final ResourceLocation ADD_WAYPOINT = new ResourceLocation("minimapsync:add_waypoint");
@@ -86,12 +86,12 @@ public class MinimapSync implements ModInitializer {
         });
 
         ServerPlayNetworking.registerGlobalReceiver(PROTOCOL_VERSION, (server, player, handler, buf, responseSender) -> {
-            ((IHasProtocolVersion) handler).minimapsync_setProtocolVersion(Math.min(CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
+            ((INetworkAddon) handler).minimapsync_setProtocolVersion(Math.min(CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
             if (ServerPlayNetworking.canSend(handler, INIT_MODEL)) {
                 server.execute(() -> {
                     FriendlyByteBuf buf2 = PacketByteBufs.create();
                     Model.get(server).toPacket(player.getUUID(), getProtocolVersion(handler), buf2);
-                    responseSender.sendPacket(INIT_MODEL, buf2);
+                    PacketSplitter.get(handler).send(INIT_MODEL, buf2);
                 });
             }
         });
@@ -135,37 +135,39 @@ public class MinimapSync implements ModInitializer {
                 }
             });
         });
-        ServerPlayNetworking.registerGlobalReceiver(ADD_ICON, (server, player, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            byte[] icon = buf.readByteArray();
-            // validate icon format
-            try {
-                ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(icon));
-                Iterator<ImageReader> imageReaders = ImageIO.getImageReaders(iis);
-                if (!imageReaders.hasNext()) {
+        ServerPlayNetworking.registerGlobalReceiver(ADD_ICON, (server, player, handler, splitBuf, responseSender) -> {
+            PacketSplitter.get(handler).receive(splitBuf, buf -> {
+                String name = buf.readUtf(256);
+                byte[] icon = buf.readByteArray();
+                // validate icon format
+                try {
+                    ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(icon));
+                    Iterator<ImageReader> imageReaders = ImageIO.getImageReaders(iis);
+                    if (!imageReaders.hasNext()) {
+                        return;
+                    }
+                    ImageReader imageReader = imageReaders.next();
+                    ImageReaderSpi originatingProvider = imageReader.getOriginatingProvider();
+                    if (originatingProvider == null) {
+                        return;
+                    }
+                    if (!ArrayUtils.contains(originatingProvider.getFormatNames(), "PNG")) {
+                        return;
+                    }
+                    imageReader.setInput(iis);
+                    int width = imageReader.getWidth(0);
+                    int height = imageReader.getHeight(0);
+                    if (width != height
+                        || width < Waypoint.MIN_ICON_DIMENSIONS
+                        || width > Waypoint.MAX_ICON_DIMENSIONS
+                        || !Mth.isPowerOfTwo(width)) {
+                        return;
+                    }
+                } catch (IOException e) {
                     return;
                 }
-                ImageReader imageReader = imageReaders.next();
-                ImageReaderSpi originatingProvider = imageReader.getOriginatingProvider();
-                if (originatingProvider == null) {
-                    return;
-                }
-                if (!ArrayUtils.contains(originatingProvider.getFormatNames(), "PNG")) {
-                    return;
-                }
-                imageReader.setInput(iis);
-                int width = imageReader.getWidth(0);
-                int height = imageReader.getHeight(0);
-                if (width != height
-                    || width < Waypoint.MIN_ICON_DIMENSIONS
-                    || width > Waypoint.MAX_ICON_DIMENSIONS
-                    || !Mth.isPowerOfTwo(width)) {
-                    return;
-                }
-            } catch (IOException e) {
-                return;
-            }
-            server.execute(() -> addIcon(server, name, icon));
+                server.execute(() -> addIcon(server, name, icon));
+            });
         });
         ServerPlayNetworking.registerGlobalReceiver(REMOVE_ICON, (server, player, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
@@ -179,7 +181,7 @@ public class MinimapSync implements ModInitializer {
     }
 
     public static int getProtocolVersion(ServerGamePacketListenerImpl handler) {
-        return ((IHasProtocolVersion) handler).minimapsync_getProtocolVersion();
+        return ((INetworkAddon) handler).minimapsync_getProtocolVersion();
     }
 
     public static int randomColor() {
@@ -388,13 +390,12 @@ public class MinimapSync implements ModInitializer {
         model.icons().put(name, icon);
         model.save(server);
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
-        buf.writeUtf(name, 256);
-        buf.writeByteArray(icon);
-        Packet<?> packet = ServerPlayNetworking.createS2CPacket(ADD_ICON, buf);
         for (ServerPlayer player : PlayerLookup.all(server)) {
             if (ServerPlayNetworking.canSend(player, ADD_ICON)) {
-                player.connection.send(packet);
+                FriendlyByteBuf buf = PacketByteBufs.create();
+                buf.writeUtf(name, 256);
+                buf.writeByteArray(icon);
+                PacketSplitter.get(player.connection).send(ADD_ICON, buf);
             }
         }
 
