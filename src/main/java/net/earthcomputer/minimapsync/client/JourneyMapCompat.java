@@ -92,6 +92,15 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
             }
             switch (waypointEvent.context) {
                 case CREATE -> {
+                    if (prevWaypoints.containsKey(waypoint.getName())) {
+                        int i = 1;
+                        String name;
+                        do {
+                            name = waypoint.getName() + " (" + i + ")";
+                        } while (prevWaypoints.containsKey(name));
+                        waypoint.setName(name);
+                    }
+
                     prevWaypoints.put(waypoint.getName(), toJourneyMap(fromJourneyMap(waypoint)));
                     MinimapSyncClient.onAddWaypoint(this, fromJourneyMap(waypoint));
                 }
