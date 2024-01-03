@@ -113,13 +113,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
 
         WaypointManager waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
 
-        // delete duplicate waypoints
-        Set<String> seenNames = new HashSet<>();
-        for (var voxelWaypoint : new ArrayList<>(waypointManager.getWaypoints())) {
-            if (!seenNames.add(voxelWaypoint.name)) {
-                waypointManager.deleteWaypoint(voxelWaypoint);
-            }
-        }
+        renameDuplicateWaypoints(waypointManager);
 
         var voxelWaypoints = waypointManager.getWaypoints();
         var serverWaypoints = serverKnownWaypoints.stream().collect(Collectors.toMap(Waypoint::name, Function.identity()));
@@ -179,6 +173,29 @@ public enum VoxelMapCompat implements IMinimapCompat {
                 }
                 serverKnownWaypoints.add(fromVoxel(waypoint));
             }
+        }
+    }
+
+    private void renameDuplicateWaypoints(WaypointManager waypointManager) {
+        boolean changed = false;
+        Set<String> existingWaypointNames = waypointManager.getWaypoints().stream().map(wpt -> wpt.name).collect(Collectors.toCollection(HashSet::new));
+        Set<String> seenWaypointNames = new HashSet<>();
+        for (var waypoint : waypointManager.getWaypoints()) {
+            if (seenWaypointNames.contains(waypoint.name)) {
+                String name;
+                int i = 0;
+                do {
+                    name = waypoint.name + " (" + ++i + ")";
+                } while (existingWaypointNames.contains(name));
+                existingWaypointNames.add(name);
+                waypoint.name = name;
+                changed = true;
+            }
+            seenWaypointNames.add(waypoint.name);
+        }
+
+        if (changed) {
+            waypointManager.saveWaypoints();
         }
     }
 

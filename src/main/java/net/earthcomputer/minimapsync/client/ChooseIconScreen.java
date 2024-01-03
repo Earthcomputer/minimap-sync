@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -182,6 +183,8 @@ public class ChooseIconScreen extends Screen {
             }
             if (iconName.isBlank()) {
                 iconName = "icon";
+            } else {
+                iconName = iconName.toLowerCase(Locale.ROOT);
             }
 
             String error = selectionList.addEntry(iconName, Path.of(file));
