@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -31,7 +32,7 @@ public record IconsSerializer(Path imageFolder) implements JsonSerializer<Icons>
         Set<String> dirty = new HashSet<>();
         if (json.isJsonObject()) {
             for (var entry : json.getAsJsonObject().entrySet()) {
-                String iconName = entry.getKey();
+                String iconName = entry.getKey().toLowerCase(Locale.ROOT);
                 String base64Image = GsonHelper.convertToString(entry.getValue(), "icon");
                 byte[] image;
                 try {
@@ -44,8 +45,9 @@ public record IconsSerializer(Path imageFolder) implements JsonSerializer<Icons>
             }
         } else {
             for (JsonElement iconNameElt : GsonHelper.convertToJsonArray(json, "icons")) {
-                String iconName = GsonHelper.convertToString(iconNameElt, "icon");
-                byte[] image = getImage(iconName);
+                String oldIconName = GsonHelper.convertToString(iconNameElt, "icon");
+                String iconName = oldIconName.toLowerCase(Locale.ROOT);
+                byte[] image = getImage(oldIconName, iconName);
                 if (image != null) {
                     result.put(iconName, image);
                 }
@@ -54,9 +56,13 @@ public record IconsSerializer(Path imageFolder) implements JsonSerializer<Icons>
         return new Icons(result, dirty);
     }
 
-    private byte @Nullable [] getImage(String iconName) {
+    private byte @Nullable [] getImage(String oldIconName, String iconName) {
         try {
-            return Files.readAllBytes(getImageFile(iconName));
+            byte[] image = Files.readAllBytes(getImageFile(oldIconName));
+            if (!oldIconName.equals(iconName)) {
+                Files.move(getImageFile(oldIconName), getImageFile(iconName));
+            }
+            return image;
         } catch (IOException e) {
             LOGGER.error("Unable to read image file " + getImageFile(iconName) + " for icon " + iconName, e);
             return null;

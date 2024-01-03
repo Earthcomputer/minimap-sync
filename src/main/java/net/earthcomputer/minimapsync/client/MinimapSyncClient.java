@@ -3,7 +3,8 @@ package net.earthcomputer.minimapsync.client;
 import com.google.common.collect.ImmutableList;
 import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.MinimapSync;
-import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
+import net.earthcomputer.minimapsync.PacketSplitter;
+import net.earthcomputer.minimapsync.ducks.INetworkAddon;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
@@ -66,14 +67,16 @@ public class MinimapSyncClient implements ClientModInitializer {
         });
 
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.PROTOCOL_VERSION, (client, handler, buf, responseSender) -> {
-            ((IHasProtocolVersion) handler).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
+            ((INetworkAddon) handler).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
             FriendlyByteBuf buf1 = PacketByteBufs.create();
             buf1.writeVarInt(MinimapSync.CURRENT_PROTOCOL_VERSION);
             responseSender.sendPacket(MinimapSync.PROTOCOL_VERSION, buf1);
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, buf, responseSender) -> {
-            Model model = new Model(getProtocolVersion(handler), buf);
-            client.execute(() -> whenReady(() -> initModel(handler, model)));
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, splitBuf, responseSender) -> {
+            PacketSplitter.get(handler).receive(splitBuf, buf -> {
+                Model model = new Model(getProtocolVersion(handler), buf);
+                client.execute(() -> whenReady(() -> initModel(handler, model)));
+            });
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_WAYPOINT, (client, handler, buf, responseSender) -> {
             Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf);
@@ -107,10 +110,12 @@ public class MinimapSyncClient implements ClientModInitializer {
             WaypointTeleportRule rule = buf.readEnum(WaypointTeleportRule.class);
             client.execute(() -> whenReady(() -> setWaypointTeleportRule(null, handler, rule)));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_ICON, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            byte[] icon = buf.readByteArray();
-            client.execute(() -> whenReady(() -> addIcon(null, handler, name, icon)));
+        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_ICON, (client, handler, splitBuf, responseSender) -> {
+            PacketSplitter.get(handler).receive(splitBuf, buf -> {
+                String name = buf.readUtf(256);
+                byte[] icon = buf.readByteArray();
+                client.execute(() -> whenReady(() -> addIcon(null, handler, name, icon)));
+            });
         });
         ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_ICON, (client, handler, buf, responseSender) -> {
             String name = buf.readUtf(256);
@@ -153,7 +158,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     }
 
     public static int getProtocolVersion(ClientPacketListener handler) {
-        return ((IHasProtocolVersion) handler).minimapsync_getProtocolVersion();
+        return ((INetworkAddon) handler).minimapsync_getProtocolVersion();
     }
 
     public static boolean isCompatibleServer() {
@@ -420,7 +425,7 @@ public class MinimapSyncClient implements ClientModInitializer {
             FriendlyByteBuf buf = PacketByteBufs.create();
             buf.writeUtf(name, 256);
             buf.writeByteArray(icon);
-            ClientPlayNetworking.send(MinimapSync.ADD_ICON, buf);
+            PacketSplitter.get(Minecraft.getInstance().getConnection()).send(MinimapSync.ADD_ICON, buf);
         }
     }
 
