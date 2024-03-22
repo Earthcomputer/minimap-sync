@@ -44,11 +44,11 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
         @Nullable Runnable confirmAction,
         Screen screen,
         int width, int height,
-        int top, int bottom,
+        int top,
         int itemHeight,
         @Nullable IconSelectionList other
     ) {
-        super(minecraft, width, height, top, bottom, itemHeight);
+        super(minecraft, width, height, top, itemHeight);
         this.screen = screen;
         this.confirmAction = Objects.requireNonNullElseGet(confirmAction, () -> () -> {});
         if (other != null) {

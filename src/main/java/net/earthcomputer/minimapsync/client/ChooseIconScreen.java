@@ -65,8 +65,8 @@ public class ChooseIconScreen extends Screen {
             minecraft,
             this::onDone,
             this,
-            width, height,
-            48, height - 64,
+            width, height - 64 - 48,
+            48,
             36,
             selectionList
         ) {
