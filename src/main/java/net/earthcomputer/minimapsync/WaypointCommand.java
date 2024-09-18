@@ -286,7 +286,7 @@ public class WaypointCommand {
         if (waypoints.isEmpty()) {
             throw NO_WAYPOINTS_EXCEPTION.create();
         }
-        source.sendSuccess(() -> MinimapSync.createComponent("""
+        source.sendSuccess(() -> MinimapSync.createComponent(source.registryAccess(), """
             {"text": "=== List of current waypoints ===", "color": "aqua", "bold": "true"}
         """), false);
         boolean canTeleport = player != null && model.teleportRule().canTeleport(player);
@@ -299,7 +299,7 @@ public class WaypointCommand {
         }
 
         waypointsByDimension.forEach((dimension, wpts) -> {
-            source.sendSuccess(() -> MinimapSync.createComponent("""
+            source.sendSuccess(() -> MinimapSync.createComponent(source.registryAccess(), """
                 {"text": "in %s", "color": "green"}
             """, dimension.location()), false);
 
@@ -355,7 +355,7 @@ public class WaypointCommand {
                 String authorStr_f = authorStr;
                 String privateStr_f = privateStr;
                 String teleportStr_f = teleportStr;
-                source.sendSuccess(() -> MinimapSync.createComponent("""
+                source.sendSuccess(() -> MinimapSync.createComponent(source.registryAccess(), """
                     [
                         "- ",
                         {"text": "%s", "color": "#%06x", "bold": "true"},
@@ -407,11 +407,11 @@ public class WaypointCommand {
             throw NO_ICONS_EXCEPTION.create();
         }
 
-        source.sendSuccess(() -> MinimapSync.createComponent("""
+        source.sendSuccess(() -> MinimapSync.createComponent(source.registryAccess(), """
             {"text": "=== List of %d icons ===", "color": "aqua", "bold": "true"}
         """, model.icons().size()), false);
         for (String icon : model.icons().names()) {
-            source.sendSuccess(() -> MinimapSync.createComponent("""
+            source.sendSuccess(() -> MinimapSync.createComponent(source.registryAccess(), """
                 [
                     "- ",
                     {"text": "%s", "color": "gold"}

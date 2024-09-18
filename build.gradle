@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.4-SNAPSHOT'
+    id 'fabric-loom' version '1.7-SNAPSHOT'
     id 'maven-publish'
     id 'com.modrinth.minotaur' version '2.+'
 }
@@ -56,22 +56,32 @@ dependencies {
     implementation 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
     include 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
 
+    def minimapMod = { name, dependency ->
+        if (name == project.run_with) {
+            modImplementation dependency
+        } else {
+            modCompileOnly dependency
+        }
+    }
+
     if (!project.voxelmap_version.isEmpty()) {
-        modImplementation "maven.modrinth:voxelmap-updated:${project.voxelmap_version}"
+        minimapMod 'voxelmap', "maven.modrinth:voxelmap-updated:${project.voxelmap_version}"
     }
     if (!project.journeymap_version.isEmpty()) {
-        modImplementation "maven.modrinth:journeymap:${project.journeymap_version}"
+        minimapMod 'journeymap', "maven.modrinth:journeymap:${project.journeymap_version}"
     }
     if (!project.journeymap_api_version.isEmpty()) {
-        modImplementation "info.journeymap:journeymap-api:${project.journeymap_api_version}"
+        minimapMod 'journeymap', "info.journeymap:journeymap-api:${project.journeymap_api_version}"
     }
     if (!project.xaeros_version.isEmpty()) {
-        modImplementation "maven.modrinth:xaeros-minimap:${project.xaeros_version}"
+        minimapMod 'xaeros', "maven.modrinth:xaeros-minimap:${project.xaeros_version}"
     }
 
     modRuntimeOnly("me.djtheredstoner:DevAuth-fabric:1.1.0") {
         exclude group: 'net.fabricmc', module: 'fabric-loader'
     }
+
+    implementation 'com.demonwav.mcdev:annotations:2.0.0'
 }
 
 processResources {
@@ -79,11 +89,11 @@ processResources {
     filteringCharset "UTF-8"
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version
+        expand "version": project.version, "mcversion": project.minecraft_version
     }
 }
 
-def targetJavaVersion = 17
+def targetJavaVersion = 21
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
     // this fixes some edge cases with special characters not displaying correctly

@@ -1,7 +1,8 @@
 package net.earthcomputer.minimapsync.model;
 
-import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
-import net.minecraft.network.FriendlyByteBuf;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -9,21 +10,17 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.IntFunction;
 
 public record Icons(Map<String, byte[]> icons, Set<String> dirty) {
-    public Icons(FriendlyByteBuf buf) {
-        this(
-            FriendlyByteBufUtil.readMap(buf, HashMap::new, FriendlyByteBuf::readUtf, FriendlyByteBuf::readByteArray),
-            new HashSet<>()
-        );
-    }
+    public static final StreamCodec<ByteBuf, Icons> STREAM_CODEC = ByteBufCodecs.map(
+        (IntFunction<Map<String, byte[]>>) HashMap::new,
+        ByteBufCodecs.STRING_UTF8,
+        ByteBufCodecs.BYTE_ARRAY
+    ).map(icons -> new Icons(icons, new HashSet<>()), Icons::icons);
 
     public Icons() {
         this(new HashMap<>(), new HashSet<>());
-    }
-
-    public void toPacket(FriendlyByteBuf buf) {
-        FriendlyByteBufUtil.writeMap(buf, icons, FriendlyByteBuf::writeUtf, FriendlyByteBuf::writeByteArray);
     }
 
     public byte @Nullable [] get(String name) {

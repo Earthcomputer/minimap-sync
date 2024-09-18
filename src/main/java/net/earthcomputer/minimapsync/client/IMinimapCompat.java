@@ -19,7 +19,7 @@ public interface IMinimapCompat {
     void setWaypointDimensions(ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions);
     void setWaypointPos(ClientPacketListener handler, String name, BlockPos pos);
     void setWaypointColor(ClientPacketListener handler, String name, int color);
-    void setWaypointDescription(ClientPacketListener handler, String name, String description);
+    void setWaypointDescription(ClientPacketListener handler, String name, @Nullable String description);
     void setWaypointTeleportRule(ClientPacketListener handler, WaypointTeleportRule rule);
     void addIcon(ClientPacketListener handler, String name, byte[] icon);
     void removeIcon(ClientPacketListener handler, String name);

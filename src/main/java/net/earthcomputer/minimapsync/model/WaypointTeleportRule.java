@@ -1,6 +1,12 @@
 package net.earthcomputer.minimapsync.model;
 
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.ByIdMap;
 import net.minecraft.world.entity.player.Player;
+
+import java.util.function.IntFunction;
 
 public enum WaypointTeleportRule {
     NEVER,
@@ -9,6 +15,9 @@ public enum WaypointTeleportRule {
     OP_PLAYERS,
     ALWAYS,
     ;
+
+    private static final IntFunction<WaypointTeleportRule> BY_ID = ByIdMap.continuous(WaypointTeleportRule::ordinal, WaypointTeleportRule.values(), ByIdMap.OutOfBoundsStrategy.ZERO);
+    public static final StreamCodec<ByteBuf, WaypointTeleportRule> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, WaypointTeleportRule::ordinal);
 
     public boolean canTeleport(Player player) {
         return switch (this) {

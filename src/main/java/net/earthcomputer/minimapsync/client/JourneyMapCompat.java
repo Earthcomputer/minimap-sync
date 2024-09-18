@@ -13,14 +13,13 @@ import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
+import net.earthcomputer.minimapsync.network.TeleportPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
@@ -274,7 +273,7 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
     }
 
     @Override
-    public void setWaypointDescription(ClientPacketListener handler, String name, String description) {
+    public void setWaypointDescription(ClientPacketListener handler, String name, @Nullable String description) {
     }
 
     @Override
@@ -293,14 +292,11 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         if (!Model.get(player.connection).teleportRule().canTeleport(player)) {
             return false;
         }
-        if (!ClientPlayNetworking.canSend(MinimapSync.TELEPORT)) {
+        if (!ClientPlayNetworking.canSend(TeleportPayload.TYPE)) {
             return false;
         }
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
-        buf.writeUtf(waypoint.getName(), 256);
-        buf.writeBoolean(false); // null dimension type (current dimension)
-        ClientPlayNetworking.send(MinimapSync.TELEPORT, buf);
+        ClientPlayNetworking.send(new TeleportPayload(waypoint.getName(), null));
 
         return true;
     }

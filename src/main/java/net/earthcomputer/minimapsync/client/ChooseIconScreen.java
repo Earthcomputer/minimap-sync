@@ -87,10 +87,10 @@ public class ChooseIconScreen extends Screen {
             }
         }
         addWidget(selectionList);
-        doneButton = addRenderableWidget(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.done\"}"), button -> onDone())
+        doneButton = addRenderableWidget(Button.builder(MinimapSync.createComponent(minecraft.level.registryAccess(), "{\"translate\": \"gui.done\"}"), button -> onDone())
             .bounds(width / 2 - 154, height - 52, 150, 20)
             .build());
-        addRenderableWidget(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.cancel\"}"), button -> onClose())
+        addRenderableWidget(Button.builder(MinimapSync.createComponent(minecraft.level.registryAccess(), "{\"translate\": \"gui.cancel\"}"), button -> onClose())
             .bounds(width / 2 + 4, height - 52, 150, 20)
             .build());
         addRenderableWidget(Button.builder(Component.nullToEmpty("Add New Icon"), button -> onAdd())
@@ -115,11 +115,6 @@ public class ChooseIconScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.drawCenteredString(font, title, width / 2, 8, 0xffffff);
         selectionList.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderDirtBackground(guiGraphics);
     }
 
     private void onDone() {
@@ -201,7 +196,7 @@ public class ChooseIconScreen extends Screen {
             ) {
                 @Override
                 protected void addButtons(int y) {
-                    addExitButton(Button.builder(MinimapSync.createComponent("{\"translate\": \"gui.ok\"}"), button -> callback.accept(false))
+                    addExitButton(Button.builder(MinimapSync.createComponent(minecraft.level.registryAccess(), "{\"translate\": \"gui.ok\"}"), button -> callback.accept(false))
                         .bounds(width / 2 - 75, y, 150, 20)
                         .build());
                 }

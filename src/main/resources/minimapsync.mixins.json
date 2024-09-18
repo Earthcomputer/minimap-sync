@@ -6,7 +6,11 @@
   "plugin": "net.earthcomputer.minimapsync.MixinConfigPlugin",
   "mixins": [
     "MinecraftServerMixin",
+    "PlayerListMixin",
+    "RegistryFriendlyByteBufMixin",
+    "ServerConfigurationPacketListenerImplMixin",
     "ServerGamePacketListenerImplMixin",
+    "ServerPlayerMixin",
     "journeymap.InternalWaypointAccessor",
     "journeymap.LogFormatterMixin",
     "xaerominimap.WaypointReaderMixin",
@@ -14,6 +18,8 @@
     "xaerominimap.WaypointsIngameRendererMixin"
   ],
   "client": [
+    "ClientCommonPacketListenerImplMixin",
+    "ClientConfigurationPacketListenerImplMixin",
     "ClientPacketListenerMixin",
     "journeymap.CmdTeleportWaypointMixin",
     "journeymap.PluginWrapperMixin",

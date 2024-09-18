@@ -1,21 +1,20 @@
 package net.earthcomputer.minimapsync.mixin;
 
-import net.earthcomputer.minimapsync.PacketSplitter;
+import net.earthcomputer.minimapsync.network.PacketSplitter;
 import net.earthcomputer.minimapsync.ducks.IHasModel;
-import net.earthcomputer.minimapsync.ducks.INetworkAddon;
+import net.earthcomputer.minimapsync.ducks.IHasPacketSplitter;
 import net.earthcomputer.minimapsync.model.Model;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(ClientPacketListener.class)
-public class ClientPacketListenerMixin implements IHasModel, INetworkAddon {
+public class ClientPacketListenerMixin implements IHasPacketSplitter<ClientPlayNetworking.Context>, IHasModel {
     @Unique
     private Model model = new Model();
     @Unique
-    private int protocolVersion;
-    @Unique
-    private final PacketSplitter packetSplitter = new PacketSplitter.Client((ClientPacketListener) (Object) this);
+    private final PacketSplitter<ClientPlayNetworking.Context> packetSplitter = new PacketSplitter.Client((ClientPacketListener) (Object) this);
 
     @Override
     public Model minimapsync_model() {
@@ -28,17 +27,7 @@ public class ClientPacketListenerMixin implements IHasModel, INetworkAddon {
     }
 
     @Override
-    public int minimapsync_getProtocolVersion() {
-        return protocolVersion;
-    }
-
-    @Override
-    public void minimapsync_setProtocolVersion(int protocolVersion) {
-        this.protocolVersion = protocolVersion;
-    }
-
-    @Override
-    public PacketSplitter minimapsync_getPacketSplitter() {
+    public PacketSplitter<ClientPlayNetworking.Context> minimapsync_getPacketSplitter() {
         return packetSplitter;
     }
 }

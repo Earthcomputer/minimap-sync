@@ -4,22 +4,20 @@ import com.mamiyaotaru.voxelmap.VoxelConstants;
 import com.mamiyaotaru.voxelmap.WaypointManager;
 import com.mamiyaotaru.voxelmap.util.DimensionManager;
 import com.mamiyaotaru.voxelmap.textures.TextureAtlas;
-import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.earthcomputer.minimapsync.model.WaypointVisibilityType;
+import net.earthcomputer.minimapsync.network.TeleportPayload;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
@@ -368,7 +366,7 @@ public enum VoxelMapCompat implements IMinimapCompat {
     }
 
     @Override
-    public void setWaypointDescription(ClientPacketListener handler, String name, String description) {
+    public void setWaypointDescription(ClientPacketListener handler, String name, @Nullable String description) {
     }
 
     @Override
@@ -386,14 +384,11 @@ public enum VoxelMapCompat implements IMinimapCompat {
         if (!Model.get(player.connection).teleportRule().canTeleport(player)) {
             return false;
         }
-        if (!ClientPlayNetworking.canSend(MinimapSync.TELEPORT)) {
+        if (!ClientPlayNetworking.canSend(TeleportPayload.TYPE)) {
             return false;
         }
 
-        FriendlyByteBuf buf = PacketByteBufs.create();
-        buf.writeUtf(waypoint.name, 256);
-        buf.writeBoolean(false); // null dimension type (current dimension)
-        ClientPlayNetworking.send(MinimapSync.TELEPORT, buf);
+        ClientPlayNetworking.send(new TeleportPayload(waypoint.name, null));
 
         return true;
     }

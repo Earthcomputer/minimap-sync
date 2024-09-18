@@ -1,32 +1,45 @@
 package net.earthcomputer.minimapsync.client;
 
 import com.google.common.collect.ImmutableList;
-import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.earthcomputer.minimapsync.MinimapSync;
-import net.earthcomputer.minimapsync.PacketSplitter;
-import net.earthcomputer.minimapsync.ducks.INetworkAddon;
+import net.earthcomputer.minimapsync.network.PacketSplitter;
+import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
+import net.earthcomputer.minimapsync.network.AddIconPayload;
+import net.earthcomputer.minimapsync.network.AddWaypointPayload;
+import net.earthcomputer.minimapsync.network.InitModelPayload;
+import net.earthcomputer.minimapsync.network.ProtocolVersionPayload;
+import net.earthcomputer.minimapsync.network.RemoveIconPayload;
+import net.earthcomputer.minimapsync.network.RemoveWaypointPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointColorPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointDescriptionPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointDimensionsPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointIconPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointPosPayload;
+import net.earthcomputer.minimapsync.network.SetWaypointTeleportRulePayload;
+import net.earthcomputer.minimapsync.network.SplitPacketPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -59,6 +72,9 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            if (getProtocolVersion(handler) < MinimapSync.MINIMUM_PROTOCOL_VERSION) {
+                handler.getConnection().disconnect(MinimapSync.translatableWithFallback("minimapsync.disconnect.server_outdated", getProtocolVersion(handler), MinimapSync.MINIMUM_PROTOCOL_VERSION));
+            }
             checkReady();
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -66,66 +82,61 @@ public class MinimapSyncClient implements ClientModInitializer {
             whenReady.clear();
         });
 
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.PROTOCOL_VERSION, (client, handler, buf, responseSender) -> {
-            ((INetworkAddon) handler).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, buf.readVarInt()));
-            FriendlyByteBuf buf1 = PacketByteBufs.create();
-            buf1.writeVarInt(MinimapSync.CURRENT_PROTOCOL_VERSION);
-            responseSender.sendPacket(MinimapSync.PROTOCOL_VERSION, buf1);
+        ClientConfigurationNetworking.registerGlobalReceiver(ProtocolVersionPayload.TYPE, (payload, context) -> {
+            if (payload.protocolVersion() < MinimapSync.MINIMUM_PROTOCOL_VERSION) {
+                context.responseSender().disconnect(MinimapSync.translatableWithFallback("minimapsync.disconnect.server_outdated", payload.protocolVersion(), MinimapSync.MINIMUM_PROTOCOL_VERSION));
+                return;
+            }
+            ((IHasProtocolVersion) getPacketListener(context)).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, payload.protocolVersion()));
+            context.responseSender().sendPacket(new ProtocolVersionPayload(MinimapSync.CURRENT_PROTOCOL_VERSION));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.INIT_MODEL, (client, handler, splitBuf, responseSender) -> {
-            PacketSplitter.get(handler).receive(splitBuf, buf -> {
-                Model model = new Model(getProtocolVersion(handler), buf);
-                client.execute(() -> whenReady(() -> initModel(handler, model)));
-            });
+        ClientPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> PacketSplitter.get(context.player().connection).receive(payload, context));
+        PacketSplitter.registerClientboundHandler(InitModelPayload.TYPE, (payload, context) -> {
+            whenReady(() -> initModel(context.player().connection, payload.model()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_WAYPOINT, (client, handler, buf, responseSender) -> {
-            Waypoint waypoint = new Waypoint(getProtocolVersion(handler), buf);
-            client.execute(() -> whenReady(() -> addWaypoint(null, handler, waypoint)));
+        ClientPlayNetworking.registerGlobalReceiver(AddWaypointPayload.TYPE, (payload, context) -> {
+            whenReady(() -> addWaypoint(null, context.player().connection, payload.waypoint()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_WAYPOINT, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            client.execute(() -> whenReady(() -> removeWaypoint(null, handler, name)));
+        ClientPlayNetworking.registerGlobalReceiver(RemoveWaypointPayload.TYPE, (payload, context) -> {
+            whenReady(() -> removeWaypoint(null, context.player().connection, payload.name()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DIMENSIONS, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            Set<ResourceKey<Level>> dimensions = FriendlyByteBufUtil.readCollection(buf, LinkedHashSet::new, buf1 -> FriendlyByteBufUtil.readResourceKey(buf1, Registries.DIMENSION));
-            client.execute(() -> whenReady(() -> setWaypointDimensions(null, handler, name, dimensions)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointDimensionsPayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointDimensions(null, context.player().connection, payload.name(), payload.dimensions()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_POS, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            BlockPos pos = buf.readBlockPos();
-            client.execute(() -> whenReady(() -> setWaypointPos(null, handler, name, pos)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointPosPayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointPos(null, context.player().connection, payload.name(), payload.pos()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_COLOR, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            int color = buf.readInt();
-            client.execute(() -> whenReady(() -> setWaypointColor(null, handler, name, color)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointColorPayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointColor(null, context.player().connection, payload.name(), payload.color()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_DESCRIPTION, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            String description = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
-            client.execute(() -> whenReady(() -> setWaypointDescription(null, handler, name, description)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointDescriptionPayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointDescription(null, context.player().connection, payload.name(), payload.description()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_WAYPOINT_TELEPORT_RULE, (client, handler, buf, responseSender) -> {
-            WaypointTeleportRule rule = buf.readEnum(WaypointTeleportRule.class);
-            client.execute(() -> whenReady(() -> setWaypointTeleportRule(null, handler, rule)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointTeleportRulePayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointTeleportRule(null, context.player().connection, payload.rule()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.ADD_ICON, (client, handler, splitBuf, responseSender) -> {
-            PacketSplitter.get(handler).receive(splitBuf, buf -> {
-                String name = buf.readUtf(256);
-                byte[] icon = buf.readByteArray();
-                client.execute(() -> whenReady(() -> addIcon(null, handler, name, icon)));
-            });
+        PacketSplitter.registerClientboundHandler(AddIconPayload.TYPE, (payload, context) -> {
+            whenReady(() -> addIcon(null, context.player().connection, payload.name(), payload.icon()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.REMOVE_ICON, (client, handler, buf, responseSender) -> {
-            String name = buf.readUtf(256);
-            client.execute(() -> whenReady(() -> removeIcon(null, handler, name)));
+        ClientPlayNetworking.registerGlobalReceiver(RemoveIconPayload.TYPE, (payload, context) -> {
+            whenReady(() -> removeIcon(null, context.player().connection, payload.name()));
         });
-        ClientPlayNetworking.registerGlobalReceiver(MinimapSync.SET_ICON, (client, handler, buf, responseSender) -> {
-            String waypoint = buf.readUtf(256);
-            String icon = FriendlyByteBufUtil.readNullable(buf, FriendlyByteBuf::readUtf);
-            client.execute(() -> whenReady(() -> setWaypointIcon(null, handler, waypoint, icon)));
+        ClientPlayNetworking.registerGlobalReceiver(SetWaypointIconPayload.TYPE, (payload, context) -> {
+            whenReady(() -> setWaypointIcon(null, context.player().connection, payload.waypoint(), payload.icon()));
         });
+    }
+
+    private static final VarHandle HANDLER_FIELD = Util.make(() -> {
+        try {
+            Class<?> clientCommonNetworkAddonClass = Class.forName("net.fabricmc.fabric.impl.networking.client.ClientCommonNetworkAddon");
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(clientCommonNetworkAddonClass, MethodHandles.lookup());
+            return lookup.findVarHandle(clientCommonNetworkAddonClass, "handler", ClientCommonPacketListenerImpl.class);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+    });
+    private static ClientConfigurationPacketListenerImpl getPacketListener(ClientConfigurationNetworking.Context context) {
+        return (ClientConfigurationPacketListenerImpl) HANDLER_FIELD.get(context.responseSender());
     }
 
     private static boolean isReady() {
@@ -157,12 +168,12 @@ public class MinimapSyncClient implements ClientModInitializer {
         whenReady.clear();
     }
 
-    public static int getProtocolVersion(ClientPacketListener handler) {
-        return ((INetworkAddon) handler).minimapsync_getProtocolVersion();
+    public static int getProtocolVersion(ClientCommonPacketListenerImpl handler) {
+        return ((IHasProtocolVersion) handler).minimapsync_getProtocolVersion();
     }
 
     public static boolean isCompatibleServer() {
-        return ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT);
+        return ClientPlayNetworking.canSend(AddWaypointPayload.TYPE);
     }
 
     private static void initModel(ClientPacketListener handler, Model model) {
@@ -261,7 +272,7 @@ public class MinimapSyncClient implements ClientModInitializer {
         }
     }
 
-    private static void setWaypointDescription(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, String description) {
+    private static void setWaypointDescription(@Nullable IMinimapCompat source, ClientPacketListener handler, String name, @Nullable String description) {
         Model model = Model.get(handler);
         model.waypoints().setDescription(null, name, description);
         for (IMinimapCompat compat : CompatsHolder.COMPATS) {
@@ -348,10 +359,8 @@ public class MinimapSyncClient implements ClientModInitializer {
             return;
         }
 
-        if (ClientPlayNetworking.canSend(MinimapSync.ADD_WAYPOINT)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            waypoint.toPacket(getProtocolVersion(connection), buf);
-            ClientPlayNetworking.send(MinimapSync.ADD_WAYPOINT, buf);
+        if (ClientPlayNetworking.canSend(AddWaypointPayload.TYPE)) {
+            ClientPlayNetworking.send(new AddWaypointPayload(waypoint));
         }
     }
 
@@ -362,10 +371,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         removeWaypoint(source, Minecraft.getInstance().getConnection(), name);
 
-        if (ClientPlayNetworking.canSend(MinimapSync.REMOVE_WAYPOINT)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(name, 256);
-            ClientPlayNetworking.send(MinimapSync.REMOVE_WAYPOINT, buf);
+        if (ClientPlayNetworking.canSend(RemoveWaypointPayload.TYPE)) {
+            ClientPlayNetworking.send(new RemoveWaypointPayload(name));
         }
     }
 
@@ -376,11 +383,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         setWaypointDimensions(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.dimensions());
 
-        if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_DIMENSIONS)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name(), 256);
-            FriendlyByteBufUtil.writeCollection(buf, waypoint.dimensions(), FriendlyByteBufUtil::writeResourceKey);
-            ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_DIMENSIONS, buf);
+        if (ClientPlayNetworking.canSend(SetWaypointDimensionsPayload.TYPE)) {
+            ClientPlayNetworking.send(new SetWaypointDimensionsPayload(waypoint.name(), waypoint.dimensions()));
         }
     }
 
@@ -391,11 +395,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         setWaypointPos(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.pos());
 
-        if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_POS)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name(), 256);
-            buf.writeBlockPos(waypoint.pos());
-            ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_POS, buf);
+        if (ClientPlayNetworking.canSend(SetWaypointPosPayload.TYPE)) {
+            ClientPlayNetworking.send(new SetWaypointPosPayload(waypoint.name(), waypoint.pos()));
         }
     }
 
@@ -406,11 +407,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         setWaypointColor(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.color());
 
-        if (ClientPlayNetworking.canSend(MinimapSync.SET_WAYPOINT_COLOR)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name(), 256);
-            buf.writeInt(waypoint.color());
-            ClientPlayNetworking.send(MinimapSync.SET_WAYPOINT_COLOR, buf);
+        if (ClientPlayNetworking.canSend(SetWaypointColorPayload.TYPE)) {
+            ClientPlayNetworking.send(new SetWaypointColorPayload(waypoint.name(), waypoint.color()));
         }
     }
 
@@ -421,11 +419,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         addIcon(source, Minecraft.getInstance().getConnection(), name, icon);
 
-        if (ClientPlayNetworking.canSend(MinimapSync.ADD_ICON)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(name, 256);
-            buf.writeByteArray(icon);
-            PacketSplitter.get(Minecraft.getInstance().getConnection()).send(MinimapSync.ADD_ICON, buf);
+        if (ClientPlayNetworking.canSend(AddIconPayload.TYPE)) {
+            PacketSplitter.get(Minecraft.getInstance().getConnection()).send(new AddIconPayload(name, icon));
         }
     }
 
@@ -436,10 +431,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         removeIcon(source, Minecraft.getInstance().getConnection(), name);
 
-        if (ClientPlayNetworking.canSend(MinimapSync.REMOVE_ICON)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(name, 256);
-            ClientPlayNetworking.send(MinimapSync.REMOVE_ICON, buf);
+        if (ClientPlayNetworking.canSend(RemoveIconPayload.TYPE)) {
+            ClientPlayNetworking.send(new RemoveIconPayload(name));
         }
     }
 
@@ -450,11 +443,8 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         setWaypointIcon(source, Minecraft.getInstance().getConnection(), waypoint.name(), waypoint.icon());
 
-        if (ClientPlayNetworking.canSend(MinimapSync.SET_ICON)) {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeUtf(waypoint.name(), 256);
-            FriendlyByteBufUtil.writeNullable(buf, waypoint.icon(), FriendlyByteBuf::writeUtf);
-            ClientPlayNetworking.send(MinimapSync.SET_ICON, buf);
+        if (ClientPlayNetworking.canSend(SetWaypointIconPayload.TYPE)) {
+            ClientPlayNetworking.send(new SetWaypointIconPayload(waypoint.name(), waypoint.icon()));
         }
     }
 }

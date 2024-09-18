@@ -7,13 +7,15 @@ import com.google.gson.reflect.TypeToken;
 import marcono1234.gson.recordadapter.RecordTypeAdapterFactory;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.ducks.IHasModel;
+import net.earthcomputer.minimapsync.network.MinimapSyncStreamCodecs;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.LowerCaseEnumTypeAdapterFactory;
@@ -34,6 +36,18 @@ public record Model(
     Icons icons
 ) {
     private static final Logger LOGGER = LogManager.getLogger();
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, Model> STREAM_CODEC = StreamCodec.composite(
+        MinimapSyncStreamCodecs.PROTOCOL_VERSION,
+        Model::formatVersion,
+        WaypointList.STREAM_CODEC,
+        Model::waypoints,
+        WaypointTeleportRule.STREAM_CODEC,
+        Model::teleportRule,
+        Icons.STREAM_CODEC,
+        Model::icons,
+        Model::new
+    );
 
     private static Gson getGson(MinecraftServer server) {
         return new GsonBuilder()
@@ -56,21 +70,8 @@ public record Model(
         );
     }
 
-    public Model(int protocolVersion, FriendlyByteBuf buf) {
-        this(
-            protocolVersion,
-            new WaypointList(protocolVersion, buf),
-            buf.readEnum(WaypointTeleportRule.class),
-            protocolVersion >= 1 ? new Icons(buf) : new Icons()
-        );
-    }
-
-    public void toPacket(UUID player, int protocolVersion, FriendlyByteBuf buf) {
-        waypoints.toPacket(player, protocolVersion, buf);
-        buf.writeEnum(teleportRule);
-        if (protocolVersion >= 1) {
-            icons.toPacket(buf);
-        }
+    public Model filterForPlayer(UUID player) {
+        return new Model(formatVersion, waypoints.filterForPlayer(player), teleportRule, icons);
     }
 
     private static Path getSavePath(MinecraftServer server) {
@@ -120,7 +121,7 @@ public record Model(
     }
 
     public void save(MinecraftServer server) {
-        Model model = updateFormatVersion();
+        Model model = withFormatVersion(MinimapSync.CURRENT_PROTOCOL_VERSION);
         Path file = getSavePath(server);
         Path newFile = file.resolveSibling("minimapsync.json.new");
         try (var writer = Files.newBufferedWriter(newFile)) {
@@ -132,8 +133,8 @@ public record Model(
         Util.safeReplaceFile(file, newFile, file.resolveSibling("minimapsync.json.old"));
     }
 
-    public Model updateFormatVersion() {
-        return new Model(MinimapSync.CURRENT_PROTOCOL_VERSION, waypoints, teleportRule, icons);
+    public Model withFormatVersion(int formatVersion) {
+        return new Model(formatVersion, waypoints, teleportRule, icons);
     }
 
     public Model withTeleportRule(WaypointTeleportRule teleportRule) {

@@ -3,15 +3,14 @@ package net.earthcomputer.minimapsync.client;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.logging.LogUtils;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
 import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.Optionull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -22,25 +21,31 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
-import xaero.common.AXaeroMinimap;
-import xaero.common.XaeroMinimapSession;
 import xaero.common.graphics.CustomRenderTypes;
 import xaero.common.graphics.renderer.multitexture.MultiTextureRenderTypeRenderer;
 import xaero.common.graphics.renderer.multitexture.MultiTextureRenderTypeRendererProvider;
-import xaero.common.minimap.waypoints.WaypointSet;
-import xaero.common.minimap.waypoints.WaypointWorld;
-import xaero.common.minimap.waypoints.WaypointWorldContainer;
-import xaero.common.minimap.waypoints.WaypointsManager;
 import xaero.common.settings.ModSettings;
+import xaero.hud.minimap.BuiltInHudModules;
+import xaero.hud.minimap.module.MinimapSession;
+import xaero.hud.minimap.waypoint.set.WaypointSet;
+import xaero.hud.minimap.world.MinimapWorld;
+import xaero.hud.minimap.world.MinimapWorldManager;
+import xaero.hud.minimap.world.container.MinimapWorldContainer;
+import xaero.hud.minimap.world.state.MinimapWorldState;
+import xaero.hud.path.XaeroPath;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public enum XaerosMapCompat implements IMinimapCompat {
     INSTANCE;
@@ -80,36 +85,30 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void initModel(ClientPacketListener listener, Model model) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
         symbolToIcon.clear();
         for (DynamicTexture icon : iconTextures.values()) {
             icon.close();
         }
         iconTextures.clear();
 
-        Set<WaypointWorld> modifiedWorlds = new HashSet<>();
+        Set<MinimapWorld> modifiedWorlds = new HashSet<>();
 
-        WaypointsManager waypointsManager = session.getWaypointsManager();
-        for (WaypointWorld waypointWorld : getWaypointWorlds(waypointsManager)) {
+        for (MinimapWorld waypointWorld : getWaypointWorlds()) {
             WaypointSet waypointSet = getWaypointSet(waypointWorld);
-            if (waypointSet.getList().removeIf(XaerosMapCompat::shouldSyncWithServer)) {
+            if (removeIf(waypointSet, XaerosMapCompat::shouldSyncWithServer)) {
                 modifiedWorlds.add(waypointWorld);
             }
         }
 
         for (var waypoint : (Iterable<Waypoint>) model.waypoints().getWaypoints(null)::iterator) {
             for (ResourceKey<Level> dimension : waypoint.dimensions()) {
-                WaypointWorld waypointWorld = getWaypointWorld(waypointsManager, dimension);
-                getWaypointSet(waypointWorld).getList().add(toXaeros(waypoint));
+                MinimapWorld waypointWorld = getWaypointWorld(dimension);
+                getWaypointSet(waypointWorld).add(toXaeros(waypoint));
                 modifiedWorlds.add(waypointWorld);
             }
         }
 
-        for (WaypointWorld modifiedWorld : modifiedWorlds) {
+        for (MinimapWorld modifiedWorld : modifiedWorlds) {
             saveWaypoints(modifiedWorld);
         }
 
@@ -118,29 +117,17 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void addWaypoint(ClientPacketListener listener, Waypoint waypoint) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
-        WaypointsManager waypointsManager = session.getWaypointsManager();
         for (ResourceKey<Level> dimension : waypoint.dimensions()) {
-            WaypointWorld waypointWorld = getWaypointWorld(waypointsManager, dimension);
-            getWaypointSet(waypointWorld).getList().add(toXaeros(waypoint));
+            MinimapWorld waypointWorld = getWaypointWorld(dimension);
+            getWaypointSet(waypointWorld).add(toXaeros(waypoint));
             saveWaypoints(waypointWorld);
         }
     }
 
     @Override
     public void removeWaypoint(ClientPacketListener listener, String name) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
-        WaypointsManager waypointsManager = session.getWaypointsManager();
-        for (WaypointWorld waypointWorld : getWaypointWorlds(waypointsManager)) {
-            if (getWaypointSet(waypointWorld).getList().removeIf(wpt -> name.equals(wpt.getName()))) {
+        for (MinimapWorld waypointWorld : getWaypointWorlds()) {
+            if (removeIf(getWaypointSet(waypointWorld), wpt -> name.equals(wpt.getName()))) {
                 saveWaypoints(waypointWorld);
             }
         }
@@ -148,27 +135,21 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointDimensions(ClientPacketListener handler, String name, Set<ResourceKey<Level>> dimensions) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
         Waypoint waypoint = Model.get(handler).waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
         }
 
-        WaypointsManager waypointsManager = session.getWaypointsManager();
-        Set<WaypointWorld> newWaypointWorlds = dimensions.stream().map(dim -> getWaypointWorld(waypointsManager, dim)).collect(Collectors.toSet());
-        for (WaypointWorld waypointWorld : getWaypointWorlds(waypointsManager)) {
+        Set<MinimapWorld> newWaypointWorlds = dimensions.stream().map(XaerosMapCompat::getWaypointWorld).collect(Collectors.toSet());
+        for (MinimapWorld waypointWorld : getWaypointWorlds()) {
             WaypointSet waypointSet = getWaypointSet(waypointWorld);
             if (newWaypointWorlds.contains(waypointWorld)) {
-                if (waypointSet.getList().stream().noneMatch(wpt -> name.equals(wpt.getName()))) {
-                    waypointSet.getList().add(toXaeros(waypoint));
+                if (stream(waypointSet).noneMatch(wpt -> name.equals(wpt.getName()))) {
+                    waypointSet.add(toXaeros(waypoint));
                     saveWaypoints(waypointWorld);
                 }
             } else {
-                if (waypointSet.getList().removeIf(wpt -> name.equals(wpt.getName()))) {
+                if (removeIf(waypointSet, wpt -> name.equals(wpt.getName()))) {
                     saveWaypoints(waypointWorld);
                 }
             }
@@ -177,20 +158,14 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointPos(ClientPacketListener handler, String name, BlockPos pos) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
         Waypoint waypoint = Model.get(handler).waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
         }
 
-        WaypointsManager waypointsManager = session.getWaypointsManager();
         for (ResourceKey<Level> dimension : waypoint.dimensions()) {
-            WaypointWorld waypointWorld = getWaypointWorld(waypointsManager, dimension);
-            getWaypointSet(waypointWorld).getList().stream().filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
+            MinimapWorld waypointWorld = getWaypointWorld(dimension);
+            stream(getWaypointSet(waypointWorld)).filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
                 wpt.setX(pos.getX());
                 wpt.setY(pos.getY());
                 wpt.setZ(pos.getZ());
@@ -201,21 +176,15 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointColor(ClientPacketListener handler, String name, int color) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
         Waypoint waypoint = Model.get(handler).waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
         }
 
-        WaypointsManager waypointsManager = session.getWaypointsManager();
         int xaeroColor = getClosestColor(color);
         for (ResourceKey<Level> dimension : waypoint.dimensions()) {
-            WaypointWorld waypointWorld = getWaypointWorld(waypointsManager, dimension);
-            getWaypointSet(waypointWorld).getList().stream().filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
+            MinimapWorld waypointWorld = getWaypointWorld(dimension);
+            stream(getWaypointSet(waypointWorld)).filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
                 wpt.setColor(xaeroColor);
             });
             saveWaypoints(waypointWorld);
@@ -223,7 +192,7 @@ public enum XaerosMapCompat implements IMinimapCompat {
     }
 
     @Override
-    public void setWaypointDescription(ClientPacketListener handler, String name, String description) {
+    public void setWaypointDescription(ClientPacketListener handler, String name, @Nullable String description) {
     }
 
     @Override
@@ -258,21 +227,15 @@ public enum XaerosMapCompat implements IMinimapCompat {
 
     @Override
     public void setWaypointIcon(ClientPacketListener handler, String name, @Nullable String icon) {
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
         Waypoint waypoint = Model.get(handler).waypoints().getWaypoint(name);
         if (waypoint == null) {
             return;
         }
 
-        WaypointsManager waypointsManager = session.getWaypointsManager();
         String symbol = makeSymbol(name, icon);
         for (ResourceKey<Level> dimension : waypoint.dimensions()) {
-            WaypointWorld waypointWorld = getWaypointWorld(waypointsManager, dimension);
-            getWaypointSet(waypointWorld).getList().stream().filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
+            MinimapWorld waypointWorld = getWaypointWorld(dimension);
+            stream(getWaypointSet(waypointWorld)).filter(w -> name.equals(w.getName())).findAny().ifPresent(wpt -> {
                 wpt.setSymbol(symbol);
             });
             saveWaypoints(waypointWorld);
@@ -283,23 +246,49 @@ public enum XaerosMapCompat implements IMinimapCompat {
         return waypoint.getWaypointType() == 0 && !waypoint.isTemporary() && !waypoint.isOneoffDestination();
     }
 
-    private static WaypointWorld getWaypointWorld(WaypointsManager manager, ResourceKey<Level> dimension) {
-        String rootContainer = manager.getAutoRootContainerID();
-        String dimensionName = manager.getDimensionDirectoryName(dimension);
-        return manager.getWorld(rootContainer + "/" + dimensionName, manager.getAutoWorldID());
+    private static MinimapWorld getWaypointWorld(ResourceKey<Level> dimension) {
+        MinimapSession session = BuiltInHudModules.MINIMAP.getCurrentSession();
+        MinimapWorldManager worldManager = session.getWorldManager();
+        MinimapWorldState worldState = session.getWorldState();
+        XaeroPath worldPath = worldState.getAutoRootContainerPath()
+            .resolve(session.getDimensionHelper().getDimensionDirectoryName(dimension))
+            .resolve(worldState.getAutoWorldPath());
+        return worldManager.getWorld(worldPath);
     }
 
-    private static WaypointSet getWaypointSet(WaypointWorld waypointWorld) {
-        WaypointSet waypointSet = waypointWorld.getSets().get("gui.xaero_default");
+    private static WaypointSet getWaypointSet(MinimapWorld waypointWorld) {
+        WaypointSet waypointSet = waypointWorld.getWaypointSet("gui.xaero_default");
         if (waypointSet != null) {
             return waypointSet;
         }
-        return waypointWorld.getCurrentSet();
+        return waypointWorld.getCurrentWaypointSet();
     }
 
-    private static List<WaypointWorld> getWaypointWorlds(WaypointsManager manager) {
-        WaypointWorldContainer rootContainer = manager.getWorldContainer(manager.getAutoRootContainerID());
-        return rootContainer.subContainers.values().stream().map(dim -> dim.addWorld(manager.getAutoWorldID())).toList();
+    private static Stream<xaero.common.minimap.waypoints.Waypoint> stream(WaypointSet waypointSet) {
+        return StreamSupport.stream(waypointSet.getWaypoints().spliterator(), false);
+    }
+
+    private static boolean removeIf(WaypointSet waypointSet, Predicate<xaero.common.minimap.waypoints.Waypoint> predicate) {
+        boolean changed = false;
+        for (int i = 0; i < waypointSet.size(); i++) {
+            if (predicate.test(waypointSet.get(i))) {
+                waypointSet.remove(i--);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private static List<MinimapWorld> getWaypointWorlds() {
+        MinimapSession session = BuiltInHudModules.MINIMAP.getCurrentSession();
+        MinimapWorldManager worldManager = session.getWorldManager();
+        MinimapWorldState worldState = session.getWorldState();
+        MinimapWorldContainer rootContainer = worldManager.getWorldContainer(worldState.getAutoRootContainerPath());
+        List<MinimapWorld> result = new ArrayList<>();
+        for (MinimapWorldContainer dim : rootContainer.getSubContainers()) {
+            result.add(dim.addWorld(Optionull.map(worldState.getAutoWorldPath(), XaeroPath::getLastNode)));
+        }
+        return result;
     }
 
     private static String makeSymbol(String waypointName, @Nullable String iconName) {
@@ -343,9 +332,9 @@ public enum XaerosMapCompat implements IMinimapCompat {
         return closestColor;
     }
 
-    private static void saveWaypoints(WaypointWorld waypointWorld) {
+    private static void saveWaypoints(MinimapWorld waypointWorld) {
         try {
-            AXaeroMinimap.INSTANCE.getSettings().saveWaypoints(waypointWorld);
+            waypointWorld.getContainer().getSession().getWorldManagerIO().saveWorld(waypointWorld);
         } catch (IOException e) {
             LOGGER.error("Failed to save waypoints", e);
         }
@@ -360,16 +349,11 @@ public enum XaerosMapCompat implements IMinimapCompat {
             return;
         }
 
-        XaeroMinimapSession session = XaeroMinimapSession.getCurrentSession();
-        if (session == null) {
-            return;
-        }
-
-        MultiTextureRenderTypeRendererProvider multiTextureRenderTypeRenderers = session.getMultiTextureRenderTypeRenderers();
+        MultiTextureRenderTypeRendererProvider multiTextureRenderTypeRenderers = BuiltInHudModules.MINIMAP.getCurrentSession().getMultiTextureRenderTypeRenderers();;
         MultiTextureRenderTypeRenderer renderer = multiTextureRenderTypeRenderers.getRenderer(textureId -> RenderSystem.setShaderTexture(0, textureId), MultiTextureRenderTypeRendererProvider::defaultTextureBind, CustomRenderTypes.GUI_NEAREST);
 
         int textureId = Minecraft.getInstance().getTextureManager().getTexture(getIconResourceLocation(icon)).getId();
-        BufferBuilder buffer = renderer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX, textureId);
+        BufferBuilder buffer = renderer.begin(textureId);
         Matrix4f pose = matrixStack.last().pose();
 
         buffer.vertex(pose, x, y, 0).color(r, g, b, a).uv(0, 0).endVertex();

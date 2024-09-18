@@ -1,3 +1,7 @@
 {
-  "minimapsync.private": "Private"
+  "minimapsync.disconnect.client_outdated": "MinimapSync on the client is outdated (client protocol (%s) is lower than minimum supported (%s) on the server)",
+  "minimapsync.disconnect.server_outdated": "MinimapSync on the server is outdated (server protocol (%s) is lower than minimum supported (%s) on the client)",
+  "minimapsync.private": "Private",
+  "minimapsync.rate_limit.add_waypoint": "You are adding waypoints too quickly",
+  "minimapsync.rate_limit.delete_waypoint": "You are deleting waypoints too quickly"
 }

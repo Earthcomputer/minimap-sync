@@ -1,8 +1,9 @@
 package net.earthcomputer.minimapsync.model;
 
-import net.earthcomputer.minimapsync.FriendlyByteBufUtil;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -12,21 +13,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class WaypointList {
+    public static final StreamCodec<RegistryFriendlyByteBuf, WaypointList> STREAM_CODEC = Waypoint.STREAM_CODEC
+        .apply(ByteBufCodecs.list())
+        .map(WaypointList::new, waypointList -> waypointList.waypoints);
+
     private final List<Waypoint> waypoints;
 
     public WaypointList() {
-        waypoints = new ArrayList<>();
+        this(new ArrayList<>());
     }
 
-    public WaypointList(int protocolVersion, FriendlyByteBuf buf) {
-        waypoints = FriendlyByteBufUtil.readList(buf, buf1 -> new Waypoint(protocolVersion, buf1));
+    private WaypointList(List<Waypoint> waypoints) {
+        this.waypoints = waypoints;
     }
 
-    public void toPacket(UUID player, int protocolVersion, FriendlyByteBuf buf) {
-        FriendlyByteBufUtil.writeCollection(buf, waypoints.stream().filter(wpt -> wpt.isVisibleTo(player)).toList(), (buf2, waypoint) -> waypoint.toPacket(protocolVersion, buf2));
+    public WaypointList filterForPlayer(UUID player) {
+        return new WaypointList(waypoints.stream().filter(wpt -> wpt.isVisibleTo(player)).collect(Collectors.toCollection(ArrayList::new)));
     }
 
     @Nullable
