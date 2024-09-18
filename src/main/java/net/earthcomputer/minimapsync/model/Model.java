@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
-import marcono1234.gson.recordadapter.RecordTypeAdapterFactory;
 import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.ducks.IHasModel;
 import net.earthcomputer.minimapsync.network.MinimapSyncStreamCodecs;
@@ -54,7 +53,6 @@ public record Model(
             .registerTypeAdapter(BlockPos.class, BlockPosSerializer.INSTANCE)
             .registerTypeAdapter(new TypeToken<ResourceKey<Level>>(){}.getType(), new ResourceKeySerializer<>(Registries.DIMENSION))
             .registerTypeAdapterFactory(new LowerCaseEnumTypeAdapterFactory())
-            .registerTypeAdapterFactory(RecordTypeAdapterFactory.builder().allowMissingComponentValues().create())
             .registerTypeAdapter(Icons.class, new IconsSerializer(server.getWorldPath(LevelResource.ROOT).resolve("minimapsync_icons")))
             .disableHtmlEscaping()
             .setPrettyPrinting()

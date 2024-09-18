@@ -32,10 +32,6 @@ repositories {
         url = 'https://maven.parchmentmc.org/'
     }
     maven {
-        name = 'JitPack'
-        url = 'https://jitpack.io/'
-    }
-    maven {
         name = 'DJTheRedstoner'
         url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1/'
     }
@@ -52,9 +48,6 @@ dependencies {
 
     // Fabric API. This is technically optional, but you probably want it anyway.
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-
-    implementation 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
-    include 'com.github.Marcono1234:gson-record-type-adapter-factory:4998f21'
 
     def minimapMod = { name, dependency ->
         if (name == project.run_with) {
