@@ -11,7 +11,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 public record TeleportPayload(String name, @Nullable ResourceKey<Level> dimension) implements CustomPacketPayload {
-    public static final Type<TeleportPayload> TYPE = new Type<>(new ResourceLocation("minimapsync", "teleport"));
+    public static final Type<TeleportPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("minimapsync", "teleport"));
     public static final StreamCodec<RegistryFriendlyByteBuf, TeleportPayload> CODEC = StreamCodec.composite(
         ByteBufCodecs.stringUtf8(256),
         TeleportPayload::name,

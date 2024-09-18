@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
-
+/*
 import journeymap.client.command.CmdTeleportWaypoint;
 import journeymap.client.waypoint.Waypoint;
 import net.earthcomputer.minimapsync.client.JourneyMapCompat;
@@ -42,3 +42,4 @@ public class CmdTeleportWaypointMixin {
         }
     }
 }
+*/

@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.function.IntFunction;
 
 public record PacketSplitterRegisterChannelsPayload(Set<ResourceLocation> channels) implements CustomPacketPayload {
-    public static final Type<PacketSplitterRegisterChannelsPayload> TYPE = new Type<>(new ResourceLocation("minimapsync", "packet_splitter_register_channels"));
+    public static final Type<PacketSplitterRegisterChannelsPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("minimapsync", "packet_splitter_register_channels"));
     public static final StreamCodec<FriendlyByteBuf, PacketSplitterRegisterChannelsPayload> CODEC = ResourceLocation.STREAM_CODEC
         .apply(ByteBufCodecs.collection((IntFunction<Set<ResourceLocation>>) HashSet::new))
         .<FriendlyByteBuf>cast()

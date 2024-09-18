@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
-
+/*
 import journeymap.client.waypoint.Waypoint;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
@@ -30,3 +30,4 @@ public abstract class WaypointMixin {
         }
     }
 }
+*/

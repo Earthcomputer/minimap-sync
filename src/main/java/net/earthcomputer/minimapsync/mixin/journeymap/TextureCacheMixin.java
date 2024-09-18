@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
-
+/*
 import journeymap.client.texture.TextureCache;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,3 +19,4 @@ public class TextureCacheMixin {
         }
     }
 }
+*/

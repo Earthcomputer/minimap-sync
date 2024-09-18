@@ -11,8 +11,10 @@
     "ServerConfigurationPacketListenerImplMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerPlayerMixin",
+    /*
     "journeymap.InternalWaypointAccessor",
     "journeymap.LogFormatterMixin",
+    */
     "xaerominimap.WaypointReaderMixin",
     "xaerominimap.WaypointsGuiRendererMixin",
     "xaerominimap.WaypointsIngameRendererMixin"
@@ -21,11 +23,13 @@
     "ClientCommonPacketListenerImplMixin",
     "ClientConfigurationPacketListenerImplMixin",
     "ClientPacketListenerMixin",
+    /*
     "journeymap.CmdTeleportWaypointMixin",
     "journeymap.PluginWrapperMixin",
     "journeymap.TextureCacheMixin",
     "journeymap.WaypointEditorMixin",
     "journeymap.WaypointMixin",
+    */
     "voxelmap.GuiAddWaypointMixin",
     "voxelmap.GuiPersistentMapMixin",
     "voxelmap.GuiSlotDimensionsMixin",

@@ -201,7 +201,7 @@ public class IconSelectionList extends ObjectSelectionList<IconSelectionList.Ent
 
         static IconRenderer makeRendererFromImage(String filePath, NativeImage image) {
             DynamicTexture texture = new DynamicTexture(image);
-            ResourceLocation textureLocation = new ResourceLocation(
+            ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath(
                 "minimapsync",
                 "dynamic_icon_" + MinimapSync.makeResourceSafeString(filePath)
             );

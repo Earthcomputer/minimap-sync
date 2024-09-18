@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.client;
-
+/*
 import com.mojang.blaze3d.platform.NativeImage;
 import journeymap.client.api.IClientAPI;
 import journeymap.client.api.IClientPlugin;
@@ -382,3 +382,4 @@ public final class JourneyMapCompat implements IClientPlugin, IMinimapCompat {
         }
     }
 }
+*/

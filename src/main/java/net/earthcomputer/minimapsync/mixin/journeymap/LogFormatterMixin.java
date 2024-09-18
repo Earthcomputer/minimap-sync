@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
-
+/*
 import journeymap.common.log.LogFormatter;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,3 +16,4 @@ public class LogFormatterMixin {
         }
     }
 }
+*/

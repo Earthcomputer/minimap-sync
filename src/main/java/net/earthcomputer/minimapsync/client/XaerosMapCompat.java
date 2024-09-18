@@ -301,7 +301,7 @@ public enum XaerosMapCompat implements IMinimapCompat {
     }
 
     private static ResourceLocation getIconResourceLocation(String icon) {
-        return new ResourceLocation("minimapsync", "xaeros_" + MinimapSync.makeResourceSafeString(icon));
+        return ResourceLocation.fromNamespaceAndPath("minimapsync", "xaeros_" + MinimapSync.makeResourceSafeString(icon));
     }
 
     private static int getClosestColor(int color) {
@@ -356,10 +356,10 @@ public enum XaerosMapCompat implements IMinimapCompat {
         BufferBuilder buffer = renderer.begin(textureId);
         Matrix4f pose = matrixStack.last().pose();
 
-        buffer.vertex(pose, x, y, 0).color(r, g, b, a).uv(0, 0).endVertex();
-        buffer.vertex(pose, x, y + height, 0).color(r, g, b, a).uv(0, 1).endVertex();
-        buffer.vertex(pose, x + width, y + height, 0).color(r, g, b, a).uv(1, 1).endVertex();
-        buffer.vertex(pose, x + width, y, 0).color(r, g, b, a).uv(1, 0).endVertex();
+        buffer.addVertex(pose, x, y, 0).setColor(r, g, b, a).setUv(0, 0);
+        buffer.addVertex(pose, x, y + height, 0).setColor(r, g, b, a).setUv(0, 1);
+        buffer.addVertex(pose, x + width, y + height, 0).setColor(r, g, b, a).setUv(1, 1);
+        buffer.addVertex(pose, x + width, y, 0).setColor(r, g, b, a).setUv(1, 0);
 
         multiTextureRenderTypeRenderers.draw(renderer);
     }

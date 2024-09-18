@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 public record SetWaypointIconPayload(String waypoint, @Nullable String icon) implements CustomPacketPayload {
-    public static final Type<SetWaypointIconPayload> TYPE = new Type<>(new ResourceLocation("minimapsync", "set_waypoint_icon"));
+    public static final Type<SetWaypointIconPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("minimapsync", "set_waypoint_icon"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SetWaypointIconPayload> CODEC = StreamCodec.composite(
         ByteBufCodecs.stringUtf8(256),
         SetWaypointIconPayload::waypoint,

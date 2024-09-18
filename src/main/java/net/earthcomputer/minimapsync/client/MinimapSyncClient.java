@@ -61,9 +61,11 @@ public class MinimapSyncClient implements ClientModInitializer {
             if (loader.isModLoaded("voxelmap")) {
                 builder.add(VoxelMapCompat.INSTANCE.init());
             }
+            /*
             if (loader.isModLoaded("journeymap-api-fabric")) {
                 builder.add(JourneyMapCompat.instance());
             }
+            */
             if (loader.isModLoaded("xaerominimap")) {
                 builder.add(XaerosMapCompat.INSTANCE.init());
             }

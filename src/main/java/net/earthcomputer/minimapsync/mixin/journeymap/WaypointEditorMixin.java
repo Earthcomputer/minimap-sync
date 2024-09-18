@@ -1,5 +1,5 @@
 package net.earthcomputer.minimapsync.mixin.journeymap;
-
+/*
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
 import journeymap.client.texture.DynamicTextureImpl;
@@ -214,3 +214,4 @@ public abstract class WaypointEditorMixin extends JmUI {
         super.removed();
     }
 }
+*/

@@ -13,7 +13,7 @@ public record SplitPacketPayload(
     boolean isLastPayload,
     byte[] data
 ) implements CustomPacketPayload {
-    public static final Type<SplitPacketPayload> TYPE = new Type<>(new ResourceLocation("minimapsync", "split_packet"));
+    public static final Type<SplitPacketPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("minimapsync", "split_packet"));
     public static final StreamCodec<FriendlyByteBuf, SplitPacketPayload> CODEC = StreamCodec.composite(
         ResourceLocation.STREAM_CODEC.map(id -> Objects.requireNonNull(PacketSplitter.getType(id), () -> "No split packet type registered for " + id), Type::id),
         SplitPacketPayload::innerType,

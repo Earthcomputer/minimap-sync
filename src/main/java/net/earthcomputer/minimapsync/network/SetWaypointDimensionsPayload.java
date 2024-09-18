@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.function.IntFunction;
 
 public record SetWaypointDimensionsPayload(String name, Set<ResourceKey<Level>> dimensions) implements CustomPacketPayload {
-    public static final Type<SetWaypointDimensionsPayload> TYPE = new Type<>(new ResourceLocation("minimapsync", "set_waypoint_dimensions"));
+    public static final Type<SetWaypointDimensionsPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("minimapsync", "set_waypoint_dimensions"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SetWaypointDimensionsPayload> CODEC = StreamCodec.composite(
         ByteBufCodecs.stringUtf8(256),
         SetWaypointDimensionsPayload::name,
