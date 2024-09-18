@@ -5,6 +5,7 @@ import com.google.common.hash.Hashing;
 import com.google.gson.stream.JsonReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
+import net.earthcomputer.minimapsync.ducks.IHasPacketSplitterSendableChannels;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
 import net.earthcomputer.minimapsync.model.Waypoint;
@@ -13,6 +14,8 @@ import net.earthcomputer.minimapsync.network.AddIconPayload;
 import net.earthcomputer.minimapsync.network.AddWaypointPayload;
 import net.earthcomputer.minimapsync.network.InitModelPayload;
 import net.earthcomputer.minimapsync.network.PacketSplitter;
+import net.earthcomputer.minimapsync.network.PacketSplitterRegisterChannelsPayload;
+import net.earthcomputer.minimapsync.network.PacketSplitterRegisterChannelsTask;
 import net.earthcomputer.minimapsync.network.ProtocolVersionPayload;
 import net.earthcomputer.minimapsync.network.ProtocolVersionTask;
 import net.earthcomputer.minimapsync.network.RemoveIconPayload;
@@ -110,6 +113,9 @@ public class MinimapSync implements ModInitializer {
             if (ServerConfigurationNetworking.canSend(handler, ProtocolVersionPayload.TYPE)) {
                 handler.addTask(ProtocolVersionTask.INSTANCE);
             }
+            if (ServerConfigurationNetworking.canSend(handler, PacketSplitterRegisterChannelsPayload.TYPE)) {
+                handler.addTask(PacketSplitterRegisterChannelsTask.INSTANCE);
+            }
         });
         ServerPlayConnectionEvents.INIT.register((handler, server) -> {
             if (getProtocolVersion(handler) < MINIMUM_PROTOCOL_VERSION) {
@@ -117,11 +123,11 @@ public class MinimapSync implements ModInitializer {
             }
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            if (ServerPlayNetworking.canSend(handler, InitModelPayload.TYPE)) {
-                server.execute(() -> {
+            server.execute(() -> {
+                if (PacketSplitter.get(handler).canSend(InitModelPayload.TYPE)) {
                     PacketSplitter.get(handler).send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
-                });
-            }
+                }
+            });
         });
 
         PayloadTypeRegistry.configurationC2S().register(ProtocolVersionPayload.TYPE, ProtocolVersionPayload.CODEC);
@@ -133,6 +139,13 @@ public class MinimapSync implements ModInitializer {
             }
             ((IHasProtocolVersion) context.networkHandler()).minimapsync_setProtocolVersion(Math.min(CURRENT_PROTOCOL_VERSION, payload.protocolVersion()));
             context.networkHandler().completeTask(ProtocolVersionTask.TYPE);
+        });
+
+        PayloadTypeRegistry.configurationC2S().register(PacketSplitterRegisterChannelsPayload.TYPE, PacketSplitterRegisterChannelsPayload.CODEC);
+        PayloadTypeRegistry.configurationS2C().register(PacketSplitterRegisterChannelsPayload.TYPE, PacketSplitterRegisterChannelsPayload.CODEC);
+        ServerConfigurationNetworking.registerGlobalReceiver(PacketSplitterRegisterChannelsPayload.TYPE, (payload, context) -> {
+            ((IHasPacketSplitterSendableChannels) context.networkHandler()).minimapsync_setPacketSplitterSendableChannels(payload.channels());
+            context.networkHandler().completeTask(PacketSplitterRegisterChannelsTask.TYPE);
         });
 
         PayloadTypeRegistry.playC2S().register(SplitPacketPayload.TYPE, SplitPacketPayload.CODEC);
@@ -428,7 +441,7 @@ public class MinimapSync implements ModInitializer {
         model.save(server);
 
         for (ServerPlayer player : PlayerLookup.all(server)) {
-            if (ServerPlayNetworking.canSend(player, AddIconPayload.TYPE)) {
+            if (PacketSplitter.get(player.connection).canSend(AddIconPayload.TYPE)) {
                 PacketSplitter.get(player.connection).send(new AddIconPayload(name, icon));
             }
         }

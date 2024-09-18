@@ -2,6 +2,7 @@ package net.earthcomputer.minimapsync.client;
 
 import com.google.common.collect.ImmutableList;
 import net.earthcomputer.minimapsync.MinimapSync;
+import net.earthcomputer.minimapsync.ducks.IHasPacketSplitterSendableChannels;
 import net.earthcomputer.minimapsync.network.PacketSplitter;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
@@ -10,6 +11,7 @@ import net.earthcomputer.minimapsync.model.WaypointTeleportRule;
 import net.earthcomputer.minimapsync.network.AddIconPayload;
 import net.earthcomputer.minimapsync.network.AddWaypointPayload;
 import net.earthcomputer.minimapsync.network.InitModelPayload;
+import net.earthcomputer.minimapsync.network.PacketSplitterRegisterChannelsPayload;
 import net.earthcomputer.minimapsync.network.ProtocolVersionPayload;
 import net.earthcomputer.minimapsync.network.RemoveIconPayload;
 import net.earthcomputer.minimapsync.network.RemoveWaypointPayload;
@@ -89,6 +91,10 @@ public class MinimapSyncClient implements ClientModInitializer {
             }
             ((IHasProtocolVersion) getPacketListener(context)).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, payload.protocolVersion()));
             context.responseSender().sendPacket(new ProtocolVersionPayload(MinimapSync.CURRENT_PROTOCOL_VERSION));
+        });
+        ClientConfigurationNetworking.registerGlobalReceiver(PacketSplitterRegisterChannelsPayload.TYPE, (payload, context) -> {
+            ((IHasPacketSplitterSendableChannels) getPacketListener(context)).minimapsync_setPacketSplitterSendableChannels(payload.channels());
+            PacketSplitter.sendClientboundSendable();
         });
         ClientPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> PacketSplitter.get(context.player().connection).receive(payload, context));
         PacketSplitter.registerClientboundHandler(InitModelPayload.TYPE, (payload, context) -> {
@@ -419,7 +425,7 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         addIcon(source, Minecraft.getInstance().getConnection(), name, icon);
 
-        if (ClientPlayNetworking.canSend(AddIconPayload.TYPE)) {
+        if (PacketSplitter.get(Minecraft.getInstance().getConnection()).canSend(AddIconPayload.TYPE)) {
             PacketSplitter.get(Minecraft.getInstance().getConnection()).send(new AddIconPayload(name, icon));
         }
     }

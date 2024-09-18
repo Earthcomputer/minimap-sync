@@ -14,7 +14,7 @@ public class ClientPacketListenerMixin implements IHasPacketSplitter<ClientPlayN
     @Unique
     private Model model = new Model();
     @Unique
-    private final PacketSplitter<ClientPlayNetworking.Context> packetSplitter = new PacketSplitter.Client((ClientPacketListener) (Object) this);
+    private PacketSplitter<ClientPlayNetworking.Context> packetSplitter;
 
     @Override
     public Model minimapsync_model() {
@@ -29,5 +29,10 @@ public class ClientPacketListenerMixin implements IHasPacketSplitter<ClientPlayN
     @Override
     public PacketSplitter<ClientPlayNetworking.Context> minimapsync_getPacketSplitter() {
         return packetSplitter;
+    }
+
+    @Override
+    public void minimapsync_setPacketSplitter(PacketSplitter<ClientPlayNetworking.Context> packetSplitter) {
+        this.packetSplitter = packetSplitter;
     }
 }

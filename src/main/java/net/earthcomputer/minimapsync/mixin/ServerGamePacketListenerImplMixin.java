@@ -11,17 +11,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(ServerGamePacketListenerImpl.class)
-public class ServerGamePacketListenerImplMixin implements IHasPacketSplitter<ServerPlayNetworking.Context>, IHasProtocolVersion {
+public class ServerGamePacketListenerImplMixin implements IHasProtocolVersion, IHasPacketSplitter<ServerPlayNetworking.Context> {
     @Shadow
     public ServerPlayer player;
-
-    @Unique
-    private final PacketSplitter<ServerPlayNetworking.Context> packetSplitter = new PacketSplitter.Server((ServerGamePacketListenerImpl) (Object) this);
-
-    @Override
-    public PacketSplitter<ServerPlayNetworking.Context> minimapsync_getPacketSplitter() {
-        return packetSplitter;
-    }
 
     @Override
     public int minimapsync_getProtocolVersion() {
@@ -31,5 +23,17 @@ public class ServerGamePacketListenerImplMixin implements IHasPacketSplitter<Ser
     @Override
     public void minimapsync_setProtocolVersion(int protocolVersion) {
         ((IHasProtocolVersion) this.player).minimapsync_setProtocolVersion(protocolVersion);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public PacketSplitter<ServerPlayNetworking.Context> minimapsync_getPacketSplitter() {
+        return ((IHasPacketSplitter<ServerPlayNetworking.Context>) this.player).minimapsync_getPacketSplitter();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void minimapsync_setPacketSplitter(PacketSplitter<ServerPlayNetworking.Context> packetSplitter) {
+        ((IHasPacketSplitter<ServerPlayNetworking.Context>) this.player).minimapsync_setPacketSplitter(packetSplitter);
     }
 }

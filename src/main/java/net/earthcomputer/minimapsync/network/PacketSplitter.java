@@ -5,37 +5,64 @@ import net.earthcomputer.minimapsync.MinimapSync;
 import net.earthcomputer.minimapsync.client.MinimapSyncClient;
 import net.earthcomputer.minimapsync.ducks.IHasPacketSplitter;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.Optionull;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public abstract sealed class PacketSplitter<C> {
     private static final Map<ResourceLocation, CustomPacketPayload.TypeAndCodec<RegistryFriendlyByteBuf, ?>> PACKET_TYPES = new HashMap<>();
     private static final Map<CustomPacketPayload.Type<?>, BiConsumer<? extends CustomPacketPayload, ClientPlayNetworking.Context>> CLIENTBOUND_HANDLERS = new HashMap<>();
     private static final Map<CustomPacketPayload.Type<?>, BiConsumer<? extends CustomPacketPayload, ServerPlayNetworking.Context>> SERVERBOUND_HANDLERS = new HashMap<>();
 
+    protected PacketSplitter(Set<ResourceLocation> sendable) {
+        this.sendable = sendable;
+    }
+
     public static <T extends CustomPacketPayload> void register(CustomPacketPayload.Type<T> type, StreamCodec<RegistryFriendlyByteBuf, T> codec) {
         PACKET_TYPES.put(type.id(), new CustomPacketPayload.TypeAndCodec<>(type, codec));
     }
 
     public static <T extends CustomPacketPayload> void registerClientboundHandler(CustomPacketPayload.Type<T> type, BiConsumer<T, ClientPlayNetworking.Context> handler) {
+        if (!PACKET_TYPES.containsKey(type.id())) {
+            throw new IllegalStateException("Registering a clientbound handler for unregistered packet type " + type.id());
+        }
+
         CLIENTBOUND_HANDLERS.put(type, handler);
     }
 
     public static <T extends CustomPacketPayload> void registerServerboundHandler(CustomPacketPayload.Type<T> type, BiConsumer<T, ServerPlayNetworking.Context> handler) {
+        if (!PACKET_TYPES.containsKey(type.id())) {
+            throw new IllegalStateException("Registering a serverbound handler for unregistered packet type " + type.id());
+        }
+
         SERVERBOUND_HANDLERS.put(type, handler);
+    }
+
+    public static void sendServerboundSendable(Consumer<Packet<?>> packetSender) {
+        packetSender.accept(ServerConfigurationNetworking.createS2CPacket(new PacketSplitterRegisterChannelsPayload(SERVERBOUND_HANDLERS.keySet().stream().map(CustomPacketPayload.Type::id).collect(Collectors.toSet()))));
+    }
+
+    public static void sendClientboundSendable() {
+        ClientConfigurationNetworking.send(new PacketSplitterRegisterChannelsPayload(CLIENTBOUND_HANDLERS.keySet().stream().map(CustomPacketPayload.Type::id).collect(Collectors.toSet())));
     }
 
     @Nullable
@@ -43,6 +70,7 @@ public abstract sealed class PacketSplitter<C> {
         return Optionull.map(PACKET_TYPES.get(id), CustomPacketPayload.TypeAndCodec::type);
     }
 
+    private final Set<ResourceLocation> sendable;
     private CustomPacketPayload.Type<?> receivingType;
     private RegistryFriendlyByteBuf receiving;
 
@@ -51,6 +79,10 @@ public abstract sealed class PacketSplitter<C> {
     protected abstract RegistryAccess getRegistryAccess();
     protected abstract void send0(SplitPacketPayload splitPayload);
     protected abstract <T extends CustomPacketPayload> void receive0(T payload, C context);
+
+    public final boolean canSend(CustomPacketPayload.Type<?> type) {
+        return sendable.contains(type.id());
+    }
 
     public final void send(CustomPacketPayload payload) {
         RegistryFriendlyByteBuf buf = encode(payload);
@@ -128,7 +160,8 @@ public abstract sealed class PacketSplitter<C> {
     public static final class Client extends PacketSplitter<ClientPlayNetworking.Context> {
         private final ClientPacketListener connection;
 
-        public Client(ClientPacketListener connection) {
+        public Client(Set<ResourceLocation> sendable, ClientPacketListener connection) {
+            super(sendable);
             this.connection = connection;
         }
 
@@ -164,10 +197,11 @@ public abstract sealed class PacketSplitter<C> {
     }
 
     public static final class Server extends PacketSplitter<ServerPlayNetworking.Context> {
-        private final ServerGamePacketListenerImpl connection;
+        private final ServerPlayer player;
 
-        public Server(ServerGamePacketListenerImpl connection) {
-            this.connection = connection;
+        public Server(Set<ResourceLocation> sendable, ServerPlayer player) {
+            super(sendable);
+            this.player = player;
         }
 
         @Override
@@ -177,17 +211,17 @@ public abstract sealed class PacketSplitter<C> {
 
         @Override
         protected int getProtocolVersion() {
-            return MinimapSync.getProtocolVersion(connection);
+            return MinimapSync.getProtocolVersion(player.connection);
         }
 
         @Override
         protected RegistryAccess getRegistryAccess() {
-            return connection.player.registryAccess();
+            return player.registryAccess();
         }
 
         @Override
         protected void send0(SplitPacketPayload splitPayload) {
-            connection.send(ServerPlayNetworking.createS2CPacket(splitPayload));
+            ServerPlayNetworking.send(player, splitPayload);
         }
 
         @SuppressWarnings("unchecked")
