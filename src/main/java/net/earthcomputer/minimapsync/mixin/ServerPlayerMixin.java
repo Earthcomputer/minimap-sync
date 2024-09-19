@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.Unique;
 public class ServerPlayerMixin implements IHasProtocolVersion, IHasPacketSplitter<ServerPlayNetworking.Context> {
     @Unique
     private int minimapsync_protocolVersion;
+    @Unique
     private PacketSplitter<ServerPlayNetworking.Context> packetSplitter;
 
     @Override

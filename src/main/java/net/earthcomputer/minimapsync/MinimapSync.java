@@ -5,6 +5,7 @@ import com.google.common.hash.Hashing;
 import com.google.gson.stream.JsonReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
+import net.earthcomputer.minimapsync.ducks.IHasPacketSplitter;
 import net.earthcomputer.minimapsync.ducks.IHasPacketSplitterSendableChannels;
 import net.earthcomputer.minimapsync.ducks.IHasProtocolVersion;
 import net.earthcomputer.minimapsync.model.Model;
@@ -30,6 +31,7 @@ import net.earthcomputer.minimapsync.network.SplitPacketPayload;
 import net.earthcomputer.minimapsync.network.TeleportPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
@@ -103,6 +105,7 @@ public class MinimapSync implements ModInitializer {
         return Component.translatableWithFallback(key, defaultTranslations.getOrDefault(key, key), args);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -128,6 +131,11 @@ public class MinimapSync implements ModInitializer {
                     PacketSplitter.get(handler).send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
                 }
             });
+        });
+
+        ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
+            ((IHasProtocolVersion) newPlayer).minimapsync_setProtocolVersion(((IHasProtocolVersion) oldPlayer).minimapsync_getProtocolVersion());
+            ((IHasPacketSplitter<ServerPlayNetworking.Context>) newPlayer).minimapsync_setPacketSplitter(((IHasPacketSplitter<ServerPlayNetworking.Context>) oldPlayer).minimapsync_getPacketSplitter());
         });
 
         PayloadTypeRegistry.configurationC2S().register(ProtocolVersionPayload.TYPE, ProtocolVersionPayload.CODEC);
