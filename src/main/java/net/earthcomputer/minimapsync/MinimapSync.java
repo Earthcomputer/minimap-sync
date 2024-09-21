@@ -120,17 +120,13 @@ public class MinimapSync implements ModInitializer {
                 handler.addTask(PacketSplitterRegisterChannelsTask.INSTANCE);
             }
         });
-        ServerPlayConnectionEvents.INIT.register((handler, server) -> {
-            if (getProtocolVersion(handler) < MINIMUM_PROTOCOL_VERSION) {
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (getProtocolVersion(handler) < MINIMUM_PROTOCOL_VERSION && ServerPlayNetworking.canSend(handler, AddWaypointPayload.TYPE)) {
                 handler.disconnect(translatableWithFallback("minimapsync.disconnect.client_outdated", getProtocolVersion(handler), CURRENT_PROTOCOL_VERSION));
             }
-        });
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            server.execute(() -> {
-                if (PacketSplitter.get(handler).canSend(InitModelPayload.TYPE)) {
-                    PacketSplitter.get(handler).send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
-                }
-            });
+            if (PacketSplitter.get(handler).canSend(InitModelPayload.TYPE)) {
+                PacketSplitter.get(handler).send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
+            }
         });
 
         ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
