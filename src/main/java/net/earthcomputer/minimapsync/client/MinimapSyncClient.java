@@ -74,7 +74,7 @@ public class MinimapSyncClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            if (getProtocolVersion(handler) < MinimapSync.MINIMUM_PROTOCOL_VERSION) {
+            if (getProtocolVersion(handler) < MinimapSync.MINIMUM_PROTOCOL_VERSION && ClientPlayNetworking.canSend(AddWaypointPayload.TYPE)) {
                 handler.getConnection().disconnect(MinimapSync.translatableWithFallback("minimapsync.disconnect.server_outdated", getProtocolVersion(handler), MinimapSync.MINIMUM_PROTOCOL_VERSION));
             }
             checkReady();
