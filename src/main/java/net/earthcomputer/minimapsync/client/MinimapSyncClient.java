@@ -89,6 +89,7 @@ public class MinimapSyncClient implements ClientModInitializer {
                 context.responseSender().disconnect(MinimapSync.translatableWithFallback("minimapsync.disconnect.server_outdated", payload.protocolVersion(), MinimapSync.MINIMUM_PROTOCOL_VERSION));
                 return;
             }
+
             ((IHasProtocolVersion) getPacketListener(context)).minimapsync_setProtocolVersion(Math.min(MinimapSync.CURRENT_PROTOCOL_VERSION, payload.protocolVersion()));
             context.responseSender().sendPacket(new ProtocolVersionPayload(MinimapSync.CURRENT_PROTOCOL_VERSION));
         });
@@ -96,7 +97,12 @@ public class MinimapSyncClient implements ClientModInitializer {
             ((IHasPacketSplitterSendableChannels) getPacketListener(context)).minimapsync_setPacketSplitterSendableChannels(payload.channels());
             PacketSplitter.sendClientboundSendable();
         });
-        ClientPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> PacketSplitter.get(context.player().connection).receive(payload, context));
+        ClientPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> {
+            var packetSplitter = PacketSplitter.get(context.player().connection);
+            if (packetSplitter != null) {
+                packetSplitter.receive(payload, context);
+            }
+        });
         PacketSplitter.registerClientboundHandler(InitModelPayload.TYPE, (payload, context) -> {
             whenReady(() -> initModel(context.player().connection, payload.model()));
         });
@@ -425,8 +431,9 @@ public class MinimapSyncClient implements ClientModInitializer {
 
         addIcon(source, Minecraft.getInstance().getConnection(), name, icon);
 
-        if (PacketSplitter.get(Minecraft.getInstance().getConnection()).canSend(AddIconPayload.TYPE)) {
-            PacketSplitter.get(Minecraft.getInstance().getConnection()).send(new AddIconPayload(name, icon));
+        var packetSplitter = PacketSplitter.get(Minecraft.getInstance().getConnection());
+        if (packetSplitter != null && packetSplitter.canSend(AddIconPayload.TYPE)) {
+            packetSplitter.send(new AddIconPayload(name, icon));
         }
     }
 

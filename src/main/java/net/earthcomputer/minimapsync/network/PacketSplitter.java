@@ -148,11 +148,13 @@ public abstract sealed class PacketSplitter<C> {
     }
 
     @SuppressWarnings("unchecked")
+    @Nullable
     public static PacketSplitter<ClientPlayNetworking.Context> get(ClientPacketListener connection) {
         return ((IHasPacketSplitter<ClientPlayNetworking.Context>) connection).minimapsync_getPacketSplitter();
     }
 
     @SuppressWarnings("unchecked")
+    @Nullable
     public static PacketSplitter<ServerPlayNetworking.Context> get(ServerGamePacketListenerImpl connection) {
         return ((IHasPacketSplitter<ServerPlayNetworking.Context>) connection).minimapsync_getPacketSplitter();
     }
