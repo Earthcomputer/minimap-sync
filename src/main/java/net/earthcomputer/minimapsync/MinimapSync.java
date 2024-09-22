@@ -123,9 +123,12 @@ public class MinimapSync implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             if (getProtocolVersion(handler) < MINIMUM_PROTOCOL_VERSION && ServerPlayNetworking.canSend(handler, AddWaypointPayload.TYPE)) {
                 handler.disconnect(translatableWithFallback("minimapsync.disconnect.client_outdated", getProtocolVersion(handler), CURRENT_PROTOCOL_VERSION));
+                return;
             }
-            if (PacketSplitter.get(handler).canSend(InitModelPayload.TYPE)) {
-                PacketSplitter.get(handler).send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
+
+            var packetSplitter = PacketSplitter.get(handler);
+            if (packetSplitter != null && packetSplitter.canSend(InitModelPayload.TYPE)) {
+                packetSplitter.send(new InitModelPayload(Model.get(server).withFormatVersion(getProtocolVersion(handler)).filterForPlayer(handler.player.getUUID())));
             }
         });
 
@@ -154,7 +157,12 @@ public class MinimapSync implements ModInitializer {
 
         PayloadTypeRegistry.playC2S().register(SplitPacketPayload.TYPE, SplitPacketPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(SplitPacketPayload.TYPE, SplitPacketPayload.CODEC);
-        ServerPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> PacketSplitter.get(context.player().connection).receive(payload, context));
+        ServerPlayNetworking.registerGlobalReceiver(SplitPacketPayload.TYPE, (payload, context) -> {
+            var packetSplitter = PacketSplitter.get(context.player().connection);
+            if (packetSplitter != null) {
+                packetSplitter.receive(payload, context);
+            }
+        });
 
         PacketSplitter.register(InitModelPayload.TYPE, InitModelPayload.CODEC);
 
@@ -445,8 +453,9 @@ public class MinimapSync implements ModInitializer {
         model.save(server);
 
         for (ServerPlayer player : PlayerLookup.all(server)) {
-            if (PacketSplitter.get(player.connection).canSend(AddIconPayload.TYPE)) {
-                PacketSplitter.get(player.connection).send(new AddIconPayload(name, icon));
+            var packetSplitter = PacketSplitter.get(player.connection);
+            if (packetSplitter != null && packetSplitter.canSend(AddIconPayload.TYPE)) {
+                packetSplitter.send(new AddIconPayload(name, icon));
             }
         }
 
